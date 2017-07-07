@@ -34,13 +34,23 @@ $(error "Please define RTE_SDK environment variable")
 endif
 
 # Default target, can be overriden by command line or environment
-RTE_TARGET ?= x86_64-native-linuxapp-gcc
-
 include $(RTE_SDK)/mk/rte.vars.mk
 
-DIRS-$(CONFIG_RTE_EXEC_ENV_LINUXAPP) += nfv
-DIRS-$(CONFIG_RTE_EXEC_ENV_LINUXAPP) += primary
-DIRS-$(CONFIG_RTE_EXEC_ENV_LINUXAPP) += vm
-DIRS-$(CONFIG_RTE_EXEC_ENV_LINUXAPP) += vf
+# binary name
+APP = spp_vf
 
-include $(RTE_SDK)/mk/rte.extsubdir.mk
+# all source are stored in SRCS-y
+SRCS-y := spp_vf.c spp_config.c classifier_mac.c spp_forward.c ringlatencystats.c ../shared/common.c
+
+CFLAGS += $(WERROR_FLAGS) -O3
+CFLAGS += -I$(SRCDIR)/../shared
+#CFLAGS += -DSPP_DEMONIZE
+#CFLAGS += -DSPP_RINGLATENCYSTATS_ENABLE
+
+LDLIBS += -ljansson
+ifeq ($(CONFIG_RTE_BUILD_SHARED_LIB),y)
+LDLIBS += -lrte_pmd_ring
+LDLIBS += -lrte_pmd_vhost
+endif
+
+include $(RTE_SDK)/mk/rte.extapp.mk
