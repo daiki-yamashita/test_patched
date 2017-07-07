@@ -150,7 +150,7 @@ config_get_if_info(const char *port, enum port_type *if_type, int *if_no)
 /*
  * MAC addressを文字列から数値へ変換
  */
-int64_t
+static int64_t
 config_change_mac_str_to_int64(const char *mac)
 {
 	int64_t ret_mac = 0;
@@ -237,7 +237,7 @@ config_load_classifier_table(const json_t *obj,
 	/* table用オブジェクトの要素数取得 */
 	int array_num = json_array_size(array_obj);
 	if (unlikely(array_num <= 0) ||
-			unlikely(array_num >= SPP_CONFIG_MAC_TABLE_MAX)) {
+			unlikely(array_num > SPP_CONFIG_MAC_TABLE_MAX)) {
 		RTE_LOG(ERR, APP, "Table size out of range. (path = %s, size = %d)\n",
 				JSONPATH_TABLE, array_num);
 		return -1;
@@ -356,7 +356,7 @@ config_set_rx_port(enum spp_core_type type, json_t *obj,
 		/* 受信ポート用オブジェクトの要素数取得 */
 		int port_num = json_array_size(array_obj);
 		if (unlikely(port_num <= 0) ||
-				unlikely(port_num >= RTE_MAX_ETHPORTS)) {
+				unlikely(port_num > RTE_MAX_ETHPORTS)) {
 			RTE_LOG(ERR, APP, "RX port out of range. (path = %s, port = %d, route = merge)\n",
 					JSONPATH_RX_PORT, port_num);
 			return -1;
@@ -551,7 +551,7 @@ config_load_proc_info(const json_t *obj, int node_id, struct spp_config_area *co
 	/* functions用オブジェクトの要素数取得 */
 	int array_num = json_array_size(array_obj);
 	if (unlikely(array_num <= 0) ||
-			unlikely(array_num >= SPP_CONFIG_CORE_MAX)) {
+			unlikely(array_num > SPP_CONFIG_CORE_MAX)) {
 		RTE_LOG(ERR, APP, "Functions size out of range. (path = %s, size = %d)\n",
 				JSONPATH_TABLE, array_num);
 		return -1;
@@ -630,18 +630,18 @@ config_load_proc_info(const json_t *obj, int node_id, struct spp_config_area *co
  * NG : -1
  */
 int
-spp_config_load_file(int node_id, struct spp_config_area *config)
+spp_config_load_file(const char* config_file_path, int node_id, struct spp_config_area *config)
 {
 	/* Config initialize */
 	config_init_data(config);
 	
 	/* Config load */
 	json_error_t json_error;
-	json_t *conf_obj = json_load_file(SPP_CONFIG_FILE_PATH, 0, &json_error);
+	json_t *conf_obj = json_load_file(config_file_path, 0, &json_error);
 	if (unlikely(conf_obj == NULL)) {
 		/* Load error */
 		RTE_LOG(ERR, APP, "Config load failed. (path = %s, text = %s)\n",
-				 SPP_CONFIG_FILE_PATH, json_error.text);
+				 config_file_path, json_error.text);
 		return -1;
 	}
 

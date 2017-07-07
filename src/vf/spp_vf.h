@@ -29,8 +29,8 @@ struct spp_core_port_info {
  * Core info
  */
 struct spp_core_info {
-	enum	spp_core_status status;
-	enum	spp_core_type type;
+	volatile enum spp_core_status status;
+	enum spp_core_type type;
 	int	num_rx_port;
 	int	num_tx_port;
 	struct spp_core_port_info rx_ports[RTE_MAX_ETHPORTS];

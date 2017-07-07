@@ -85,6 +85,6 @@ struct spp_config_area {
  * OK : 0
  * NG : -1
  */
-int spp_config_load_file(int node_id, struct spp_config_area *config);
+int spp_config_load_file(const char* config_file_path, int node_id, struct spp_config_area *config);
 
 #endif /* __SPP_CONFIG_H__ */

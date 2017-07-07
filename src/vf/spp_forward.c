@@ -1,7 +1,8 @@
 #include "spp_vf.h"
 #include "ringlatencystats.h"
+#include "spp_forward.h"
 
-#define RTE_LOGTYPE_SPP_FORWARD RTE_LOGTYPE_USER1
+#define RTE_LOGTYPE_FORWARD RTE_LOGTYPE_USER1
 
 /*
  * 送受信ポートの経路情報
@@ -14,7 +15,7 @@ struct rxtx {
 /*
  * 使用するIF情報を移し替える
  */
-void
+static void
 set_use_interface(struct spp_core_port_info *dst,
 		struct spp_core_port_info *src)
 {

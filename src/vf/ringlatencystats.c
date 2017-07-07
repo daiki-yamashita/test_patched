@@ -59,8 +59,8 @@ spp_ringlatencystats_init(uint64_t samp_intvl, uint16_t stats_count)
 	g_stats_count = stats_count;
 
 	RTE_LOG(DEBUG, SPP_RING_LATENCY_STATS,
-			"g_samp_intvl=%lu, g_stats_count=%hu, cpns=%lu\n",
-			g_samp_intvl, g_stats_count, cycles_per_ns());
+			"g_samp_intvl=%lu, g_stats_count=%hu, cpns=%lu, NS_PER_SEC=%f\n",
+			g_samp_intvl, g_stats_count, cycles_per_ns(), NS_PER_SEC);
 
 	return 0;
 }
@@ -95,6 +95,8 @@ spp_ringlatencystats_add_time_stamp(int ring_id,
 		/* when it is over sampling interval */
 		/* set tsc to mbuf::timestamp */
 		if (unlikely(stats_info->timer_tsc >= g_samp_intvl)) {
+			RTE_LOG(DEBUG, SPP_RING_LATENCY_STATS,
+					"Set timestamp. ring_id=%d, pkts_index=%u, timestamp=%lu\n", ring_id, i, now);
 			pkts[i]->timestamp = now;
 			stats_info->timer_tsc = 0;
 		}

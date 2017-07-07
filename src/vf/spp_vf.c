@@ -14,6 +14,15 @@
 #define SPP_CORE_STATUS_CHECK_MAX 5
 #define SPP_RING_LATENCY_STATS_SAMPLING_INTERVAL 1000000
 
+/* getopt_long return value for long option */
+enum SPP_LONGOPT_RETVAL {
+	SPP_LONGOPT_RETVAL__ = 127,
+
+	/* add below */
+
+	SPP_LONGOPT_RETVAL_CONFIG,
+};
+
 /* struct */
 struct startup_param {
 	uint64_t cpu;
@@ -41,13 +50,18 @@ static struct startup_param	g_startup_param;
 static struct if_info		g_if_info;
 static struct spp_core_info	g_core_info[SPP_CONFIG_CORE_MAX];
 
+static char config_file_path[PATH_MAX];
+
 /*
  * print a usage message
  */
 static void
 usage(const char *progname)
 {
-	RTE_LOG(INFO, APP, "Usage: %s [EAL args]\n\n", progname);
+	RTE_LOG(INFO, APP, "Usage: %s [EAL args] -- [--config CONFIG_FILE_PATH]\n"
+			" --config CONFIG_FILE_PATH: specific config file path\n"
+			"\n"
+			, progname);
 }
 
 /*
@@ -208,7 +222,7 @@ set_core_status(enum spp_core_status status)
 /*
  * Process stop
  */
-void
+static void
 stop_process(int signal) {
 	if (unlikely(signal != SIGTERM) &&
 			unlikely(signal != SIGINT)) {
@@ -239,15 +253,22 @@ parse_cpu_bit(uint64_t *cpu, const char *cpu_bit)
 }
 
 /*
- * Parse the application arguments to the client app.
+ * Parse the dpdk arguments for use in client app.
  */
 static int
-parse_app_args(int argc, char *argv[])
+parse_dpdk_args(int argc, char *argv[])
 {
+	int cnt;
 	int option_index, opt;
-	char **argvopt = argv;
+	const int argcopt = argc;
+	char *argvopt[argcopt];
 	const char *progname = argv[0];
 	static struct option lgopts[] = { {0} };
+
+	/* getoptを使用するとargvが並び変わるみたいなので、コピーを実施 */
+	for (cnt = 0; cnt < argcopt; cnt++) {
+		argvopt[cnt] = argv[cnt];
+	}
 
 	/* Check DPDK parameter */
 	optind = 0;
@@ -265,6 +286,48 @@ parse_app_args(int argc, char *argv[])
 		default:
 			/* CPU */
 			/* DPDKのパラメータは他にもあるので、エラーとはしない */
+			break;
+		}
+	}
+
+	return 0;
+}
+
+/*
+ * Parse the application arguments to the client app.
+ */
+static int
+parse_app_args(int argc, char *argv[])
+{
+	int cnt;
+	int option_index, opt;
+	const int argcopt = argc;
+	char *argvopt[argcopt];
+	const char *progname = argv[0];
+	static struct option lgopts[] = { 
+			{ "config", required_argument, NULL, SPP_LONGOPT_RETVAL_CONFIG },
+			{ 0 },
+	 };
+
+	/* getoptを使用するとargvが並び変わるみたいなので、コピーを実施 */
+	for (cnt = 0; cnt < argcopt; cnt++) {
+		argvopt[cnt] = argv[cnt];
+	}
+
+	/* Check application parameter */
+	optind = 0;
+	opterr = 0;
+	while ((opt = getopt_long(argc, argvopt, "", lgopts,
+			&option_index)) != EOF) {
+		switch (opt) {
+		case SPP_LONGOPT_RETVAL_CONFIG:
+			if (optarg[0] == '\0' || strlen(optarg) >= sizeof(config_file_path)) {
+				usage(progname);
+				return -1;
+			}
+			strcpy(config_file_path, optarg);
+			break;
+		default:
 			break;
 		}
 	}
@@ -299,7 +362,7 @@ get_if_area(enum port_type if_type, int if_no)
  * IF情報初期化
  */
 static void
-init_if_info()
+init_if_info(void)
 {
 	memset(&g_if_info, 0x00, sizeof(g_if_info));
 }
@@ -308,7 +371,7 @@ init_if_info()
  * CORE情報初期化
  */
 static void
-init_core_info()
+init_core_info(void)
 {
 	memset(&g_core_info, 0x00, sizeof(g_core_info));
 	int core_cnt, port_cnt;
@@ -330,7 +393,7 @@ set_form_proc_info(struct spp_config_area *config)
 	int core_cnt, rx_start, rx_cnt, tx_start, tx_cnt;
 	enum port_type if_type;
 	int if_no;
-	int64_t cpu_bit = 0;
+	uint64_t cpu_bit = 0;
 	struct spp_config_functions *core_func = NULL;
 	struct spp_core_info *core_info = NULL;
 	struct patch_info *patch_info = NULL;
@@ -344,7 +407,7 @@ set_form_proc_info(struct spp_config_area *config)
 
 		/* Forwardをまとめる事は可、他種別は不可 */
 		if ((core_info->type != SPP_CONFIG_UNUSE) &&
-				((core_info->type != SPP_CONFIG_FORWARD) &&
+				((core_info->type != SPP_CONFIG_FORWARD) ||
 				(core_func->type != SPP_CONFIG_FORWARD))) {
 			RTE_LOG(ERR, APP, "Core in use. (core = %d, type = %d/%d)\n",
 					core_func->core_no,
@@ -371,8 +434,8 @@ set_form_proc_info(struct spp_config_area *config)
 
 			patch_info->use_flg = 1;
 			if (unlikely(patch_info->rx_core != NULL)) {
-				RTE_LOG(ERR, APP, "Used RX port (if_type = %d, if_no = %d)\n",
-						if_type, if_no);
+				RTE_LOG(ERR, APP, "Used RX port (core = %d, if_type = %d, if_no = %d)\n",
+						core_func->core_no, if_type, if_no);
 				return -1;
 			}
 
@@ -395,8 +458,8 @@ set_form_proc_info(struct spp_config_area *config)
 
 			patch_info->use_flg = 1;
 			if (unlikely(patch_info->tx_core != NULL)) {
-				RTE_LOG(ERR, APP, "Used TX port (if_type = %d, if_no = %d)\n",
-						if_type, if_no);
+				RTE_LOG(ERR, APP, "Used TX port (core = %d, if_type = %d, if_no = %d)\n",
+						core_func->core_no, if_type, if_no);
 				return -1;
 			}
 
@@ -456,7 +519,7 @@ set_from_classifier_table(struct spp_config_area *config)
  * NIC用の情報設定
  */
 static int
-set_nic_interface(struct spp_config_area *config)
+set_nic_interface(struct spp_config_area *config __attribute__ ((unused)))
 {
 	/* NIC Setting */
 	g_if_info.num_nic = rte_eth_dev_count();
@@ -590,8 +653,8 @@ static int
 init_manage_data(struct spp_config_area *config)
 {
 	/* Initialize */
-	init_if_info(config);
-	init_core_info(config);
+	init_if_info();
+	init_core_info();
 
 	/* Set config data */
 	int ret_proc = set_form_proc_info(config);
@@ -629,7 +692,7 @@ init_manage_data(struct spp_config_area *config)
 
 #ifdef SPP_RINGLATENCYSTATS_ENABLE /* RING滞留時間 */
 static void
-print_ring_latency_stats()
+print_ring_latency_stats(void)
 {
 	/* Clear screen and move to top left */
 	const char topLeft[] = { 27, '[', '1', ';', '1', 'H', '\0' };
@@ -669,6 +732,24 @@ print_ring_latency_stats()
 #endif /* SPP_RINGLATENCYSTATS_ENABLE */
 
 /*
+ * VHOST用ソケットファイル削除
+ */
+static void
+del_vhost_sockfile(struct patch_info *vhost_patchs)
+{
+	int cnt;
+	for (cnt = 0; cnt < RTE_MAX_ETHPORTS; cnt++) {
+		if (likely(vhost_patchs[cnt].use_flg == 0)) {
+			/* VHOST未使用はスキップ */
+			continue;
+		}
+
+		/* 使用していたVHOSTについて削除を行う */
+		remove(get_vhost_iface_name(cnt));
+	}
+}
+
+/*
  * main
  */
 int
@@ -692,17 +773,14 @@ ut_main(int argc, char *argv[])
 	signal(SIGTERM, stop_process);
 	signal(SIGINT,  stop_process);
 
+	/* set default config file path */
+	strcpy(config_file_path, SPP_CONFIG_FILE_PATH);
+
 	unsigned int main_lcore_id = 0xffffffff;
 	while(1) {
-		/* Parse parameters */
-		int ret_parse = parse_app_args(argc, argv);
+		/* Parse dpdk parameters */
+		int ret_parse = parse_dpdk_args(argc, argv);
 		if (unlikely(ret_parse != 0)) {
-			break;
-		}
-
-		/* Load config */
-		int ret_config = spp_config_load_file(0, &g_config);
-		if (unlikely(ret_config != 0)) {
 			break;
 		}
 
@@ -711,6 +789,28 @@ ut_main(int argc, char *argv[])
 		if (unlikely(ret_dpdk < 0)) {
 			break;
 		}
+
+		/* Skip dpdk parameters */
+		argc -= ret_dpdk;
+		argv += ret_dpdk;
+
+		/* Set log level  */
+		rte_log_set_global_level(RTE_LOG_LEVEL);
+
+		/* Parse application parameters */
+		ret_parse = parse_app_args(argc, argv);
+		if (unlikely(ret_parse != 0)) {
+			break;
+		}
+
+		RTE_LOG(INFO, APP, "Load config file(%s)\n", config_file_path);
+
+		/* Load config */
+		int ret_config = spp_config_load_file(config_file_path, 0, &g_config);
+		if (unlikely(ret_config != 0)) {
+			break;
+		}
+
 		/* Get core id. */
 		main_lcore_id = rte_lcore_id();
 
@@ -775,7 +875,6 @@ ut_main(int argc, char *argv[])
 	}
 
 	/* exit */
-	stop_process(SIGINT);
 	if (main_lcore_id == rte_lcore_id())
 	{
 		g_core_info[main_lcore_id].status = SPP_CORE_STOP;
@@ -783,6 +882,9 @@ ut_main(int argc, char *argv[])
 		if (unlikely(ret_core_end != 0)) {
 			RTE_LOG(ERR, APP, "Core did not stop.\n");
 		}
+
+		/* 使用していたVHOSTのソケットファイルを削除 */
+		del_vhost_sockfile(g_if_info.vhost_patchs);
 	}
 
 	/* 他機能部終了処理 */
