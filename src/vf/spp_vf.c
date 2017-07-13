@@ -468,12 +468,14 @@ set_form_proc_info(struct spp_config_area *config)
 		}
 	}
 
+#if 0 /* bugfix#385 */
 	if (unlikely((cpu_bit & g_startup_param.cpu) != cpu_bit)) {
 		/* CPU mismatch */
 		RTE_LOG(ERR, APP, "CPU mismatch (cpu param = %lx, config = %lx)\n",
 				g_startup_param.cpu, cpu_bit);
 		return -1;
 	}
+#endif
 	return 0;
 }
 
