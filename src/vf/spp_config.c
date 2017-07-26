@@ -206,9 +206,8 @@ config_load_classifier_table(const json_t *obj,
 	/* classifier_table用オブジェクト取得 */
 	json_t *classifier_obj = json_path_get(obj, JSONPATH_CLASSIFIER_TABLE);
 	if (unlikely(classifier_obj == NULL)) {
-		RTE_LOG(ERR, APP, "Json object get failed. (path = %s)\n",
-				JSONPATH_CLASSIFIER_TABLE);
-		return -1;
+		RTE_LOG(INFO, APP, "No classifier table.\n");
+		return 0;
 	}
 
 	/* name取得 */
@@ -428,6 +427,7 @@ config_set_tx_port(enum spp_core_type type, json_t *obj,
 		struct spp_config_functions *functions,
 		struct spp_config_classifier_table *classifier_table)
 {
+	int cnt = 0;
 	struct spp_config_port_info *tmp_tx_port = NULL;
 	char if_str[SPP_CONFIG_STR_LEN];
 	if ((type == SPP_CONFIG_MERGE) || (type == SPP_CONFIG_FORWARD)) {
@@ -454,16 +454,81 @@ config_set_tx_port(enum spp_core_type type, json_t *obj,
 		}
 	} else {
 		/* Classifier */
-		int cnt = 0;
-		functions->num_tx_port = classifier_table->num_table;
-		struct spp_config_mac_table_element *tmp_mac_table = NULL;
-		for (cnt = 0; cnt < classifier_table->num_table; cnt++) {
-			tmp_tx_port = &functions->tx_ports[cnt];
-			tmp_mac_table = &classifier_table->mac_tables[cnt];
+		json_t *table_obj = json_path_get(obj, JSONPATH_TX_TABLE);
+		if (unlikely(table_obj != NULL)) {
+			/* Classifier Tableから取得 */
+			functions->num_tx_port = classifier_table->num_table;
+			struct spp_config_mac_table_element *tmp_mac_table = NULL;
+			for (cnt = 0; cnt < classifier_table->num_table; cnt++) {
+				tmp_tx_port = &functions->tx_ports[cnt];
+				tmp_mac_table = &classifier_table->mac_tables[cnt];
 
-			/* MAC振り分けテーブルより設定 */
-			tmp_tx_port->if_type = tmp_mac_table->port.if_type;
-			tmp_tx_port->if_no   = tmp_mac_table->port.if_no;
+				/* MAC振り分けテーブルより設定 */
+				tmp_tx_port->if_type = tmp_mac_table->port.if_type;
+				tmp_tx_port->if_no   = tmp_mac_table->port.if_no;
+			}
+			
+		}
+		else
+		{
+			/* tx_portパラメータより取得 */
+			/* 送信ポート用オブジェクト取得 */
+			json_t *array_obj = json_path_get(obj, JSONPATH_TX_PORT);
+			if (unlikely(array_obj == NULL)) {
+				RTE_LOG(ERR, APP, "Json object get failed. (path = %s, route = classifier)\n",
+					JSONPATH_TX_PORT);
+				return -1;
+			}
+
+			/* 送信ポート用オブジェクトが配列かチェック */
+			if (unlikely(!json_is_array(array_obj))) {
+				RTE_LOG(ERR, APP, "Not an array. (path = %s, route = classifier)\n",
+					JSONPATH_TX_PORT);
+				return -1;
+			}
+
+			/* 受信ポート用オブジェクトの要素数取得 */
+			int port_num = json_array_size(array_obj);
+			if (unlikely(port_num <= 0) ||
+					unlikely(port_num > RTE_MAX_ETHPORTS)) {
+				RTE_LOG(ERR, APP, "TX port out of range. (path = %s, port = %d, route = classifier)\n",
+						JSONPATH_TX_PORT, port_num);
+				return -1;
+			}
+			functions->num_tx_port = port_num;
+
+			/* 要素毎にデータ取得 */
+			int array_cnt = 0;
+			for (array_cnt = 0; array_cnt < port_num; array_cnt++) {
+				tmp_tx_port = &functions->tx_ports[array_cnt];
+
+				/* 要素取得 */
+				json_t *elements_obj = json_array_get(array_obj, array_cnt);
+				if (unlikely(elements_obj == NULL)) {
+					RTE_LOG(ERR, APP,
+						"Element get failed. (No = %d, path = %s, route = classifier)\n",
+						array_cnt, JSONPATH_TX_PORT);
+					return -1;
+				}
+
+				/* String type check */
+				if (unlikely(!json_is_string(elements_obj))) {
+					RTE_LOG(ERR, APP, "Not a string. (path = %s, No = %d, route = classifier)\n",
+							JSONPATH_TX_PORT, array_cnt);
+					return -1;
+				}
+				strcpy(if_str, json_string_value(elements_obj));
+
+				/* IF種別とIF番号に分割 */
+				int ret_if = config_get_if_info(if_str, &tmp_tx_port->if_type,
+						&tmp_tx_port->if_no);
+				if (unlikely(ret_if != 0)) {
+					RTE_LOG(ERR, APP,
+						"Interface change failed. (No = %d, port = %s, route = classifier)\n",
+						array_cnt, if_str);
+					return -1;
+				}
+			}
 		}
 	}
 
