@@ -1,3 +1,4 @@
+#include <netinet/in.h>
 #include <arpa/inet.h>
 #include <getopt.h>
 
@@ -21,19 +22,26 @@ enum SPP_LONGOPT_RETVAL {
 	/* add below */
 
 	SPP_LONGOPT_RETVAL_CONFIG,
+	SPP_LONGOPT_RETVAL_PROCESS_ID
 };
 
 /* struct */
 struct startup_param {
 	uint64_t cpu;
+	int process_id;
+	char server_ip[INET_ADDRSTRLEN];
+	int server_port;
 };
 
 struct patch_info {
-	int	use_flg;
-	int	dpdk_port;
-	struct spp_config_mac_table_element *mac_info;
-	struct spp_core_port_info *rx_core;
-	struct spp_core_port_info *tx_core;
+	int      use_flg;
+	int      dpdk_port;
+	int      rx_core_no;
+	int      tx_core_no;
+	char     mac_addr_str[SPP_CONFIG_STR_LEN];
+	uint64_t mac_addr;
+	struct   spp_core_port_info *rx_core;
+	struct   spp_core_port_info *tx_core;
 };
 
 struct if_info {
@@ -49,6 +57,7 @@ static struct spp_config_area	g_config;
 static struct startup_param	g_startup_param;
 static struct if_info		g_if_info;
 static struct spp_core_info	g_core_info[SPP_CONFIG_CORE_MAX];
+static int 			g_change_core[SPP_CONFIG_CORE_MAX];
 
 static char config_file_path[PATH_MAX];
 
@@ -58,9 +67,10 @@ static char config_file_path[PATH_MAX];
 static void
 usage(const char *progname)
 {
-	RTE_LOG(INFO, APP, "Usage: %s [EAL args] -- [--config CONFIG_FILE_PATH]\n"
-			" --config CONFIG_FILE_PATH: specific config file path\n"
-			"\n"
+	RTE_LOG(INFO, APP, "Usage: %s [EAL args] -- --process-id PROC_ID [--config CONFIG_FILE_PATH] -s SERVER_IP:SERVER_PORT\n"
+			" --process-id PROCESS_ID   : My process ID\n"
+			" --config CONFIG_FILE_PATH : specific config file path\n"
+			" -s SERVER_IP:SERVER_PORT  : Access information to the server\n"
 			, progname);
 }
 
@@ -294,6 +304,47 @@ parse_dpdk_args(int argc, char *argv[])
 }
 
 /*
+ * Parses the process ID of the application argument.
+ */
+static int
+parse_app_process_id(const char *process_id_str, int *process_id)
+{
+	int id = 0;
+	char *endptr = NULL;
+
+	id = strtol(process_id_str, &endptr, 0);
+	if (unlikely(process_id_str == endptr) || unlikely(*endptr != '\0'))
+		return -1;
+
+	*process_id = id;
+	RTE_LOG(DEBUG, APP, "Set process id = %d\n", *process_id);
+	return 0;
+}
+
+/*
+ * Parses server information of application arguments.
+ */
+static int
+parse_app_server(const char *server_str, char *server_ip, int *server_port)
+{
+	const char delim[2] = ":";
+	int pos = 0;
+	int port = 0;
+	char *endptr = NULL;
+
+	pos = strcspn(server_str, delim);
+	port = strtol(&server_str[pos+1], &endptr, 0);
+	if (unlikely(&server_str[pos+1] == endptr) || unlikely(*endptr != '\0'))
+		return -1;
+
+	memcpy(server_ip, server_str, pos);
+	*server_port = port;
+	RTE_LOG(DEBUG, APP, "Set server ip   = %s\n", server_ip);
+	RTE_LOG(DEBUG, APP, "Set server port = %d\n", *server_port);
+	return 0;
+}
+
+/*
  * Parse the application arguments to the client app.
  */
 static int
@@ -306,8 +357,9 @@ parse_app_args(int argc, char *argv[])
 	const char *progname = argv[0];
 	static struct option lgopts[] = { 
 			{ "config", required_argument, NULL, SPP_LONGOPT_RETVAL_CONFIG },
+			{ "process-id", required_argument, NULL, SPP_LONGOPT_RETVAL_PROCESS_ID },
 			{ 0 },
-	 };
+	};
 
 	/* getoptを使用するとargvが並び変わるみたいなので、コピーを実施 */
 	for (cnt = 0; cnt < argcopt; cnt++) {
@@ -317,7 +369,7 @@ parse_app_args(int argc, char *argv[])
 	/* Check application parameter */
 	optind = 0;
 	opterr = 0;
-	while ((opt = getopt_long(argc, argvopt, "", lgopts,
+	while ((opt = getopt_long(argc, argvopt, "s:", lgopts,
 			&option_index)) != EOF) {
 		switch (opt) {
 		case SPP_LONGOPT_RETVAL_CONFIG:
@@ -327,11 +379,31 @@ parse_app_args(int argc, char *argv[])
 			}
 			strcpy(config_file_path, optarg);
 			break;
+		case SPP_LONGOPT_RETVAL_PROCESS_ID:
+			if (parse_app_process_id(optarg, &g_startup_param.process_id) != 0) {
+				usage(progname);
+				return -1;
+			}
+			break;
+		case 's':
+			if (parse_app_server(optarg, g_startup_param.server_ip,
+					&g_startup_param.server_port) != 0) {
+				usage(progname);
+				return -1;
+			}
+			break;
 		default:
+			usage(progname);
+			return -1;
 			break;
 		}
 	}
 
+	RTE_LOG(INFO, APP, "application arguments value. (process id = %d, config = %s, server = %s:%d)\n",
+			g_startup_param.process_id,
+			config_file_path,
+			g_startup_param.server_ip,
+			g_startup_param.server_port);
 	return 0;
 }
 
@@ -364,7 +436,16 @@ get_if_area(enum port_type if_type, int if_no)
 static void
 init_if_info(void)
 {
+	int port_cnt;
 	memset(&g_if_info, 0x00, sizeof(g_if_info));
+	for (port_cnt = 0; port_cnt < RTE_MAX_ETHPORTS; port_cnt++) {
+		g_if_info.nic_patchs[port_cnt].rx_core_no   = -1;
+		g_if_info.nic_patchs[port_cnt].tx_core_no   = -1;
+		g_if_info.vhost_patchs[port_cnt].rx_core_no = -1;
+		g_if_info.vhost_patchs[port_cnt].tx_core_no = -1;
+		g_if_info.ring_patchs[port_cnt].rx_core_no  = -1;
+		g_if_info.ring_patchs[port_cnt].tx_core_no  = -1;
+	}
 }
 
 /*
@@ -376,11 +457,13 @@ init_core_info(void)
 	memset(&g_core_info, 0x00, sizeof(g_core_info));
 	int core_cnt, port_cnt;
 	for (core_cnt = 0; core_cnt < SPP_CONFIG_CORE_MAX; core_cnt++) {
+		g_core_info[core_cnt].lcore_id = core_cnt;
 		for (port_cnt = 0; port_cnt < RTE_MAX_ETHPORTS; port_cnt++) {
 			g_core_info[core_cnt].rx_ports[port_cnt].if_type = UNDEF;
 			g_core_info[core_cnt].tx_ports[port_cnt].if_type = UNDEF;
 		}
 	}
+	memset(g_change_core, 0x00, sizeof(g_change_core));
 }
 
 /*
@@ -440,7 +523,8 @@ set_form_proc_info(struct spp_config_area *config)
 			}
 
 			/* IF情報からCORE情報を変更する場合用に設定 */
-			patch_info->rx_core = &core_info->rx_ports[rx_start + rx_cnt];
+			patch_info->rx_core_no = core_cnt;
+			patch_info->rx_core    = &core_info->rx_ports[rx_start + rx_cnt];
 		}
 
 		/* Set TX port */
@@ -464,7 +548,8 @@ set_form_proc_info(struct spp_config_area *config)
 			}
 
 			/* IF情報からCORE情報を変更する場合用に設定 */
-			patch_info->tx_core = &core_info->tx_ports[tx_start + tx_cnt];
+			patch_info->tx_core_no = core_cnt;
+			patch_info->tx_core    = &core_info->tx_ports[tx_start + tx_cnt];
 		}
 	}
 
@@ -508,7 +593,8 @@ set_from_classifier_table(struct spp_config_area *config)
 
 		/* CORE情報側にもMACアドレスの情報設定 */
 		/* MACアドレスは送信側のみに影響する為、送信側のみ設定 */
-		patch_info->mac_info = mac_table;
+		patch_info->mac_addr = mac_table->mac_addr;
+		strcpy(patch_info->mac_addr_str, mac_table->mac_addr_str);
 		if (unlikely(patch_info->tx_core != NULL)) {
 			patch_info->tx_core->mac_addr = mac_table->mac_addr;
 			strcpy(patch_info->tx_core->mac_addr_str, mac_table->mac_addr_str);
@@ -864,6 +950,8 @@ ut_main(int argc, char *argv[])
 #else
 		{
 #endif
+			/* コマンド受付追加予定箇所           */
+			/* 戻り値等があれば、判定文も追加予定 */
 			sleep(1);
 
 #ifdef SPP_RINGLATENCYSTATS_ENABLE /* RING滞留時間 */
@@ -895,4 +983,164 @@ ut_main(int argc, char *argv[])
 #endif /* SPP_RINGLATENCYSTATS_ENABLE */
 	RTE_LOG(INFO, APP, "spp_vf exit.\n");
 	return ret;
+}
+
+/*
+ * Get process ID
+ */
+int
+spp_get_process_id(void)
+{
+	return g_startup_param.process_id;
+}
+
+/*
+ * Check the MAC address used on the interface
+ */
+static int
+check_mac_used_interface(uint64_t mac_addr, enum port_type *if_type, int *if_no)
+{
+	int cnt = 0;
+	for (cnt = 0; cnt < RTE_MAX_ETHPORTS; cnt++) {
+		if (unlikely(g_if_info.nic_patchs[cnt].mac_addr == mac_addr)) {
+			*if_type = PHY;
+			*if_no = cnt;
+			return 0;
+		}
+		if (unlikely(g_if_info.vhost_patchs[cnt].mac_addr == mac_addr)) {
+			*if_type = VHOST;
+			*if_no = cnt;
+			return 0;
+		}
+		if (unlikely(g_if_info.ring_patchs[cnt].mac_addr == mac_addr)) {
+			*if_type = RING;
+			*if_no = cnt;
+			return 0;
+		}
+	}
+	return -1;
+}
+
+/*
+ * Update Classifier_table
+ */
+int
+spp_update_classifier_table(
+		enum spp_classifier_type type,
+		const char *data,
+		struct spp_config_port_info *port)
+{
+	enum port_type if_type = UNDEF;
+        int if_no = 0;
+	struct patch_info *patch_info = NULL;
+	int64_t ret_mac = 0;
+	uint64_t mac_addr = 0;
+	int ret_used = 0;
+
+	if (type == SPP_CLASSIFIER_TYPE_MAC) {
+		RTE_LOG(DEBUG, APP, "update_classifier_table ( type = mac, data = %s, port = %d:%d )\n",
+				data, port->if_type, port->if_no);
+
+		ret_mac = spp_config_change_mac_str_to_int64(data);
+		if (unlikely(ret_mac == -1)) {
+			RTE_LOG(ERR, APP, "MAC address format error. ( mac = %s )\n", data);
+			return SPP_RET_NG;
+		}
+
+		mac_addr = (uint64_t)ret_mac;
+
+		ret_used = check_mac_used_interface(mac_addr, &if_type, &if_no);
+		if (port->if_type == UNDEF) {
+			/* Delete(unuse) */
+			if (ret_used < 0) {
+				RTE_LOG(DEBUG, APP, "No MAC address. ( mac = %s )\n", data);
+				return SPP_RET_OK;
+			}
+
+			patch_info = get_if_area(if_type, if_no);
+			if (unlikely(patch_info == NULL)) {
+				RTE_LOG(ERR, APP, "No port. ( port = %d:%d )\n", port->if_type, port->if_no);
+				return SPP_RET_NG;
+			}
+
+			patch_info->mac_addr = 0;
+			memset(patch_info->mac_addr_str, 0x00, SPP_CONFIG_STR_LEN);
+			if (patch_info->tx_core != NULL) {
+				patch_info->tx_core->mac_addr = 0;
+				memset(patch_info->tx_core->mac_addr_str, 0x00, SPP_CONFIG_STR_LEN);
+			}
+		}
+		else
+		{
+			/* Setting */
+			if (unlikely(ret_used == 0)) {
+				if (likely(port->if_type == if_type) && likely(port->if_no == if_no)) {
+					RTE_LOG(DEBUG, APP, "Same MAC address and port. ( mac = %s, port = %d:%d )\n",
+							data, if_type, if_no);
+					return SPP_RET_OK;
+				}
+				else
+				{
+					RTE_LOG(ERR, APP, "MAC address in used. ( mac = %s )\n", data);
+					return SPP_RET_USED_MAC;
+				}
+			}
+
+			patch_info = get_if_area(port->if_type, port->if_no);
+			if (unlikely(patch_info == NULL)) {
+				RTE_LOG(ERR, APP, "No port. ( port = %d:%d )\n", port->if_type, port->if_no);
+				return SPP_RET_NG;
+			}
+
+			if (unlikely(patch_info->use_flg != 0)) {
+				RTE_LOG(ERR, APP, "Port not added. ( port = %d:%d )\n", port->if_type, port->if_no);
+				return SPP_RET_NOT_ADD_PORT;
+			}
+
+			if (unlikely(patch_info->mac_addr != 0)) {
+				RTE_LOG(ERR, APP, "Port in used. ( port = %d:%d )\n", port->if_type, port->if_no);
+				return SPP_RET_USED_PORT;
+			}
+
+			patch_info->mac_addr = mac_addr;
+			strcpy(patch_info->mac_addr_str, data);
+			if (patch_info->tx_core != NULL) {
+				patch_info->tx_core->mac_addr = mac_addr;
+				strcpy(patch_info->tx_core->mac_addr_str, data);
+			}
+		}
+	}
+
+	/* 更新コマンドで設定した場合、コア毎に変更有無を保持 */
+	g_change_core[patch_info->tx_core_no] = 1;
+	return SPP_RET_OK;
+}
+
+/*
+ * Flush SPP component
+ */
+int
+spp_flush(void)
+{
+	int core_cnt = 0;
+	int ret_classifier = 0;
+	struct spp_core_info *core_info = NULL;
+
+	for(core_cnt = 0; core_cnt < SPP_CONFIG_CORE_MAX; core_cnt++) {
+		if (g_change_core[core_cnt] == 0)
+			continue;
+
+		core_info = &g_core_info[core_cnt];
+		if (core_info->type == SPP_CONFIG_CLASSIFIER_MAC) {
+//			ret_classifier = spp_classifier_mac_update(core_info);
+			if (unlikely(ret_classifier < 0)) {
+				RTE_LOG(ERR, APP, "Flush error. ( component = classifier_mac)\n");
+				return SPP_RET_NG;
+			}
+		}
+	}
+
+	/* 更新完了により変更したコアをクリア */
+	memset(g_change_core, 0x00, sizeof(g_change_core));
+	return SPP_RET_OK;
 }
