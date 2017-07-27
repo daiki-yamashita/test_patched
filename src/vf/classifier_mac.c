@@ -94,7 +94,7 @@ static rte_atomic16_t g_hash_table_count = RTE_ATOMIC16_INIT(0xff);
 /* initialize classifier table. */
 static int
 init_classifier_table(struct rte_hash **classifier_table,
-		struct spp_core_info *core_info)
+		const struct spp_core_info *core_info)
 {
 	int ret = -1;
 	int i;
@@ -142,9 +142,7 @@ init_classifier(const struct spp_core_info *core_info,
 {
 	int ret = -1;
 	int i;
-	struct ether_addr eth_addr;
 	char hash_table_name[HASH_TABLE_NAME_BUF_SZ];
-	char mac_addr_str[ETHER_ADDR_STR_BUF_SZ];
 
 	struct rte_hash **classifier_mac_table = NULL;
 
