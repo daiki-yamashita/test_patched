@@ -104,6 +104,10 @@ init_classifier_table(struct rte_hash **classifier_table,
 	rte_hash_reset(*classifier_table);
 
 	for (i = 0; i < core_info->num_tx_port; i++) {
+		if (core_info->tx_ports[i].mac_addr == 0) {
+			continue;
+		}
+
 		rte_memcpy(&eth_addr, &core_info->tx_ports[i].mac_addr, ETHER_ADDR_LEN);
 
 		/* add entry to classifier mac table */
@@ -188,25 +192,15 @@ init_classifier(const struct spp_core_info *core_info,
 	classifier_mac_table = &classifier_mng_info->info[classifier_mng_info->ref_index].
 			classifier_table;
 
+	ret = init_classifier_table(classifier_mac_table, core_info);
+	if (unlikely(ret != 0)) {
+		RTE_LOG(ERR, SPP_CLASSIFIER_MAC,
+				"Cannot initialize classifer mac table. ret=%d\n", ret);
+		return -1;
+	}
+
+	/* store ports information */
 	for (i = 0; i < core_info->num_tx_port; i++) {
-		rte_memcpy(&eth_addr, &core_info->tx_ports[i].mac_addr, ETHER_ADDR_LEN);
-
-		/* TODO:when modify this code, consider to use init_classifier_table function */
-
-		/* add entry to classifier mac table */
-		ret = rte_hash_add_key_data(*classifier_mac_table,
-				(void*)&eth_addr, (void*)(long)i);
-		if (unlikely(ret < 0)) {
-			ether_format_addr(mac_addr_str, sizeof(mac_addr_str), &eth_addr);
-			RTE_LOG(ERR, SPP_CLASSIFIER_MAC,
-					"Cannot add entry to classifier mac table. "
-					"ret=%d, mac_addr=%s\n", ret, mac_addr_str);
-			rte_hash_free(*classifier_mac_table);
-			*classifier_mac_table = NULL;
-			return -1;
-		}
-
-		/* set value */
 		classified_data[i].if_type = core_info->tx_ports[i].if_type;
 		classified_data[i].if_no   = i;
 		classified_data[i].tx_port = core_info->tx_ports[i].dpdk_port;
@@ -301,6 +295,19 @@ classify_packet(struct rte_mbuf **rx_pkts, uint16_t n_rx,
 	}
 }
 
+static inline void
+change_update_index(struct classifier_mac_mng_info *classifier_mng_info, unsigned int lcore_id)
+{
+	if (unlikely(classifier_mng_info->ref_index == 
+			classifier_mng_info->upd_index)) {
+		RTE_LOG(DEBUG, SPP_CLASSIFIER_MAC,
+				"Core[%u] Change update index.", lcore_id);
+		classifier_mng_info->upd_index = 
+				(classifier_mng_info->upd_index + 1) % 
+				NUM_CLASSIFIER_MAC_INFO;
+	}
+}
+
 /* classifier(mac address) update component info. */
 int
 spp_classifier_mac_update(struct spp_core_info *core_info)
@@ -375,14 +382,7 @@ spp_classifier_mac_do(void *arg)
 
 		while(likely(core_info->status == SPP_CORE_FORWARD)) {
 			/* change index of update side */
-			if (unlikely(classifier_mng_info->ref_index == 
-					classifier_mng_info->upd_index)) {
-				RTE_LOG(DEBUG, SPP_CLASSIFIER_MAC,
-						"Core[%u] Change update index.", lcore_id);
-				classifier_mng_info->upd_index = 
-						(classifier_mng_info->upd_index + 1) % 
-						NUM_CLASSIFIER_MAC_INFO;
-			}
+			change_update_index(classifier_mng_info, lcore_id);
 
 			/* decide classifier infomation of the current cycle */
 			classifier_info = classifier_mng_info->info + 
@@ -423,6 +423,9 @@ spp_classifier_mac_do(void *arg)
 			classify_packet(rx_pkts, n_rx, classifier_info, classified_data);
 		}
 	}
+
+	/* just in case */
+	change_update_index(classifier_mng_info, lcore_id);
 
 	/* uninitialize */
 	uninit_classifier(classifier_mng_info);
