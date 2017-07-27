@@ -1039,7 +1039,7 @@ int
 spp_update_classifier_table(
 		enum spp_classifier_type type,
 		const char *data,
-		struct spp_config_port_info *port)
+		const struct spp_config_port_info *port)
 {
 	enum port_type if_type = UNDEF;
         int if_no = 0;

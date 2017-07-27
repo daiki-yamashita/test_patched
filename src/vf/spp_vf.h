@@ -73,7 +73,7 @@ int spp_get_process_id(void);
  *    : SPP_RET_NOT_ADD_PORT(-3)
  *    : SPP_RET_USED_PORT(-4)
  */
-int spp_update_classifier_table(enum spp_classifier_type type, const char *data, struct spp_config_port_info *port);
+int spp_update_classifier_table(enum spp_classifier_type type, const char *data, const struct spp_config_port_info *port);
 
 /*
  * Flush SPP component
