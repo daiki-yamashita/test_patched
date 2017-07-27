@@ -1107,7 +1107,7 @@ spp_update_classifier_table(
 				return SPP_RET_NG;
 			}
 
-			if (unlikely(patch_info->use_flg != 0)) {
+			if (unlikely(patch_info->use_flg == 0)) {
 				RTE_LOG(ERR, APP, "Port not added. ( port = %d:%d )\n", port->if_type, port->if_no);
 				return SPP_RET_NOT_ADD_PORT;
 			}
