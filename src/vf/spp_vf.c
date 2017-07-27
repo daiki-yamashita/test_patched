@@ -10,6 +10,7 @@
 #include "ringlatencystats.h"
 #include "classifier_mac.h"
 #include "spp_forward.h"
+#include "command_proc.h"
 
 /* define */
 #define SPP_CORE_STATUS_CHECK_MAX 5
@@ -910,6 +911,14 @@ ut_main(int argc, char *argv[])
 		}
 
 		/* 他機能部初期化 */
+		/* コマンド機能部初期化 */
+		int ret_command_init = spp_command_proc_init(
+				g_startup_param.server_ip,
+				g_startup_param.server_port);
+		if (unlikely(ret_command_init != 0)) {
+			break;
+		}
+
 #ifdef SPP_RINGLATENCYSTATS_ENABLE /* RING滞留時間 */
 		int ret_ringlatency = spp_ringlatencystats_init(
 				SPP_RING_LATENCY_STATS_SAMPLING_INTERVAL, g_if_info.num_ring);
@@ -950,8 +959,10 @@ ut_main(int argc, char *argv[])
 #else
 		{
 #endif
-			/* コマンド受付追加予定箇所           */
-			/* 戻り値等があれば、判定文も追加予定 */
+			/* コマンド受付 */
+			spp_command_proc_do();
+
+			/* CPUを占有しない様に1秒スリープ */
 			sleep(1);
 
 #ifdef SPP_RINGLATENCYSTATS_ENABLE /* RING滞留時間 */
@@ -1132,7 +1143,7 @@ spp_flush(void)
 
 		core_info = &g_core_info[core_cnt];
 		if (core_info->type == SPP_CONFIG_CLASSIFIER_MAC) {
-//			ret_classifier = spp_classifier_mac_update(core_info);
+			ret_classifier = spp_classifier_mac_update(core_info);
 			if (unlikely(ret_classifier < 0)) {
 				RTE_LOG(ERR, APP, "Flush error. ( component = classifier_mac)\n");
 				return SPP_RET_NG;
