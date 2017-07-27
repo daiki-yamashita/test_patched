@@ -524,7 +524,7 @@ set_form_proc_info(struct spp_config_area *config)
 			}
 
 			/* IF情報からCORE情報を変更する場合用に設定 */
-			patch_info->rx_core_no = core_cnt;
+			patch_info->rx_core_no = core_func->core_no;
 			patch_info->rx_core    = &core_info->rx_ports[rx_start + rx_cnt];
 		}
 
@@ -549,7 +549,7 @@ set_form_proc_info(struct spp_config_area *config)
 			}
 
 			/* IF情報からCORE情報を変更する場合用に設定 */
-			patch_info->tx_core_no = core_cnt;
+			patch_info->tx_core_no = core_func->core_no;
 			patch_info->tx_core    = &core_info->tx_ports[tx_start + tx_cnt];
 		}
 	}
