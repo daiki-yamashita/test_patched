@@ -104,8 +104,8 @@ config_init_data(struct spp_config_area *config)
  * IFの情報からIF種別とIF番号を取得する
  * ("ring0" -> 種別："ring"、番号：0)
  */
-static int
-config_get_if_info(const char *port, enum port_type *if_type, int *if_no)
+int
+spp_config_get_if_info(const char *port, enum port_type *if_type, int *if_no)
 {
 	enum port_type type = UNDEF;
 	const char *no_str = NULL;
@@ -150,8 +150,8 @@ config_get_if_info(const char *port, enum port_type *if_type, int *if_no)
 /*
  * MAC addressを文字列から数値へ変換
  */
-static int64_t
-config_change_mac_str_to_int64(const char *mac)
+int64_t
+spp_config_change_mac_str_to_int64(const char *mac)
 {
 	int64_t ret_mac = 0;
 	int64_t token_val = 0;
@@ -270,7 +270,7 @@ config_load_classifier_table(const json_t *obj,
 		}
 
 		/* MACアドレス数値変換 */
-		int64_t ret_mac64 = config_change_mac_str_to_int64(
+		int64_t ret_mac64 = spp_config_change_mac_str_to_int64(
 				tmp_table->mac_addr_str);
 		if (unlikely(ret_mac64 == -1)) {
 			RTE_LOG(ERR, APP,
@@ -291,7 +291,7 @@ config_load_classifier_table(const json_t *obj,
 		}
 
 		/* IF種別とIF番号に分割 */
-		int ret_if = config_get_if_info(if_str, &tmp_table->port.if_type,
+		int ret_if = spp_config_get_if_info(if_str, &tmp_table->port.if_type,
 				&tmp_table->port.if_no);
 		if (unlikely(ret_if != 0)) {
 			RTE_LOG(ERR, APP,
@@ -385,7 +385,7 @@ config_set_rx_port(enum spp_core_type type, json_t *obj,
 			strcpy(if_str, json_string_value(elements_obj));
 
 			/* IF種別とIF番号に分割 */
-			int ret_if = config_get_if_info(if_str, &tmp_rx_port->if_type,
+			int ret_if = spp_config_get_if_info(if_str, &tmp_rx_port->if_type,
 					&tmp_rx_port->if_no);
 			if (unlikely(ret_if != 0)) {
 				RTE_LOG(ERR, APP,
@@ -407,7 +407,7 @@ config_set_rx_port(enum spp_core_type type, json_t *obj,
 		}
 
 		/* IF種別とIF番号に分割 */
-		int ret_if = config_get_if_info(if_str, &tmp_rx_port->if_type,
+		int ret_if = spp_config_get_if_info(if_str, &tmp_rx_port->if_type,
 				&tmp_rx_port->if_no);
 		if (unlikely(ret_if != 0)) {
 			RTE_LOG(ERR, APP,
@@ -444,7 +444,7 @@ config_set_tx_port(enum spp_core_type type, json_t *obj,
 		}
 
 		/* IF種別とIF番号に分割 */
-		int ret_if = config_get_if_info(if_str, &tmp_tx_port->if_type,
+		int ret_if = spp_config_get_if_info(if_str, &tmp_tx_port->if_type,
 				&tmp_tx_port->if_no);
 		if (unlikely(ret_if != 0)) {
 			RTE_LOG(ERR, APP,
@@ -520,7 +520,7 @@ config_set_tx_port(enum spp_core_type type, json_t *obj,
 				strcpy(if_str, json_string_value(elements_obj));
 
 				/* IF種別とIF番号に分割 */
-				int ret_if = config_get_if_info(if_str, &tmp_tx_port->if_type,
+				int ret_if = spp_config_get_if_info(if_str, &tmp_tx_port->if_type,
 						&tmp_tx_port->if_no);
 				if (unlikely(ret_if != 0)) {
 					RTE_LOG(ERR, APP,

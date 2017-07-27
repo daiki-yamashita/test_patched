@@ -81,6 +81,21 @@ struct spp_config_area {
 };
 
 /*
+ * Change mac address string to int64
+ * OK : int64 that store mac address
+ * NG : -1
+ */
+int64_t spp_config_change_mac_str_to_int64(const char *mac);
+
+/*
+ * Extract if-type/if-number from port string
+ *
+ * OK : 0
+ * NG : -1
+ */
+int spp_config_get_if_info(const char *port, enum port_type *if_type, int *if_no);
+
+/*
  * Load config file
  * OK : 0
  * NG : -1

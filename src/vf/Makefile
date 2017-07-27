@@ -40,7 +40,7 @@ include $(RTE_SDK)/mk/rte.vars.mk
 APP = spp_vf
 
 # all source are stored in SRCS-y
-SRCS-y := spp_vf.c spp_config.c classifier_mac.c spp_forward.c ringlatencystats.c ../shared/common.c
+SRCS-y := spp_vf.c spp_config.c classifier_mac.c spp_forward.c command_proc.c ringlatencystats.c ../shared/common.c
 
 CFLAGS += $(WERROR_FLAGS) -O3
 CFLAGS += -I$(SRCDIR)/../shared
