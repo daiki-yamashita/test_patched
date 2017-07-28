@@ -540,17 +540,19 @@ decode_request(struct request *request, const char *request_str, size_t request_
 
 	/* parse json string */
 	top_obj = json_loadb(request_str, request_str_len, 0, &json_error);
-	if (unlikely(*top_obj == NULL)) {
+	if (unlikely(top_obj == NULL)) {
 		RTE_LOG(ERR, SPP_COMMAND_PROC, "Cannot parse command request. "
 				"error=%s, request_str=%.*s\n", 
-				json_error.text, request_str_len, request_str);
+				json_error.text, (int)request_str_len, request_str);
 		return -1;
 	}
 
 	/* decode request object */
 	ret = decode_json_object(request, top_obj, DECODERULE_REQUEST);
 	if (unlikely(ret != 0)) {
-		// TODO:エラー
+		RTE_LOG(ERR, SPP_COMMAND_PROC, "Cannot decode command request. "
+				"ret=%d, request_str=%.*s\n", 
+				ret, (int)request_str_len, request_str);
 		return -1;
 	}
 
@@ -597,7 +599,7 @@ process_request(const char *request_str, size_t request_str_len)
 	struct request request;
 
 	RTE_LOG(DEBUG, SPP_COMMAND_PROC, "Receive command request. "
-			"request_str=%.*s\n", request_str_len, request_str);
+			"request_str=%.*s\n", (int)request_str_len, request_str);
 
 	memset(&request, 0, sizeof(struct request));
 
