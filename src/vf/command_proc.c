@@ -14,6 +14,7 @@
 
 #include "spp_vf.h"
 #include "spp_config.h"
+#include "command_proc.h"
 
 
 #define RTE_LOGTYPE_SPP_COMMAND_PROC RTE_LOGTYPE_USER1
@@ -279,6 +280,7 @@ struct command {
 /* request parameters */
 struct request {
 	int num_command;
+	int num_valid_command;
 	struct command commands[CMD_MAX_COMMANDS];
 };
 
@@ -315,9 +317,9 @@ struct json_value_decode_rule {
 
 /* definition helper that enum value decode procedure */
 #define DECODE_ENUM_VALUE(proc_name, enum_type, string_table)			\
-int										\
+static int									\
 decode_##proc_name##_value(void *output, const json_t *value_obj,		\
-		const struct json_value_decode_rule *rule)			\
+		__rte_unused const struct json_value_decode_rule *rule)		\
 {										\
 	int i;									\
 	enum_type type;								\
@@ -343,7 +345,7 @@ DECODE_ENUM_VALUE(classifier_type, enum classifier_type, CLASSIFILER_TYPE_STRING
 /* decode procedure for integer */
 static int
 decode_int_value(void *output, const json_t *value_obj,
-		const struct json_value_decode_rule *rule)
+		__rte_unused const struct json_value_decode_rule *rule)
 {
 	int val = json_integer_value(value_obj);
 	memcpy(output, &val, sizeof(int));
@@ -354,7 +356,7 @@ decode_int_value(void *output, const json_t *value_obj,
 /* decode procedure for string */
 static int
 decode_string_value(void *output, const json_t *value_obj,
-		const struct json_value_decode_rule *rule)
+		__rte_unused const struct json_value_decode_rule *rule)
 {
 	const char* str_val = json_string_value(value_obj);
 #if 0
@@ -373,7 +375,7 @@ decode_string_value(void *output, const json_t *value_obj,
 /* decode procedure for spp_config_port_info */
 static int
 decode_port_value(void *output, const json_t *value_obj,
-		const struct json_value_decode_rule *rule)
+		__rte_unused const struct json_value_decode_rule *rule)
 {
 	int ret = -1;
 	struct spp_config_port_info *port = (struct spp_config_port_info *)output;
@@ -477,7 +479,7 @@ const struct json_value_decode_rule DECODERULE_CLASSIFIER_TABLE_COMMAND[] = {
 /*  */
 static int
 decode_command_object(void* output, const json_t *parent_obj,
-		const struct json_value_decode_rule *rule)
+		__rte_unused const struct json_value_decode_rule *rule)
 {
 	int ret = -1;
 	struct command *command = (struct command *)output;
@@ -530,23 +532,23 @@ const struct json_value_decode_rule DECODERULE_REQUEST[] = {
 
 /*  */
 static int
-decode_request(struct request *request, json_t **top_obj, const char *request_str, size_t request_str_len)
+decode_request(struct request *request, const char *request_str, size_t request_str_len)
 {
 	int ret = -1;
-	int i;
+	json_t *top_obj;
 	json_error_t json_error;
 
 	/* parse json string */
-	*top_obj = json_loadb(request_str, request_str_len, 0, &json_error);
+	top_obj = json_loadb(request_str, request_str_len, 0, &json_error);
 	if (unlikely(*top_obj == NULL)) {
 		RTE_LOG(ERR, SPP_COMMAND_PROC, "Cannot parse command request. "
-				"error=%s\n", 
-				json_error.text);
+				"error=%s, request_str=%.*s\n", 
+				json_error.text, request_str_len, request_str);
 		return -1;
 	}
 
 	/* decode request object */
-	ret = decode_json_object(request, *top_obj, DECODERULE_REQUEST);
+	ret = decode_json_object(request, top_obj, DECODERULE_REQUEST);
 	if (unlikely(ret != 0)) {
 		// TODO:エラー
 		return -1;
@@ -593,24 +595,24 @@ process_request(const char *request_str, size_t request_str_len)
 	int i;
 
 	struct request request;
-	json_t *top_obj;
+
+	RTE_LOG(DEBUG, SPP_COMMAND_PROC, "Receive command request. "
+			"request_str=%.*s\n", request_str_len, request_str);
 
 	memset(&request, 0, sizeof(struct request));
 
-	ret = decode_request(&request, &top_obj, request_str, request_str_len);
+	ret = decode_request(&request, request_str, request_str_len);
 	if (unlikely(ret != 0))
 		return -1;
 
 	for (i = 0; i < request.num_command ; ++i) {
 		ret = execute_command(request.commands + i);
 	}
+
+	return 0;
 }
 
-
-////////////////////////////////////////////////////////////////////////////////
-
-
-/*  */
+/* initialize command processor. */
 int
 spp_command_proc_init(const char *controller_ip, int controller_port)
 {
@@ -620,7 +622,7 @@ spp_command_proc_init(const char *controller_ip, int controller_port)
 	return 0;
 }
 
-/*  */
+/* process command from controller. */
 void
 spp_command_proc_do(void)
 {
