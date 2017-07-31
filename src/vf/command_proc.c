@@ -16,19 +16,25 @@
 #include "spp_config.h"
 #include "command_proc.h"
 
-
 #define RTE_LOGTYPE_SPP_COMMAND_PROC RTE_LOGTYPE_USER1
 
 
-////////////////////////////////////////////////////////////////////////////////
+/*******************************************************************************
+ *
+ * operate connection with controller
+ *
+ ******************************************************************************/
 
-
+/* receive message buffer size */
 #define MESSAGE_BUFFER_BLOCK_SIZE 512
 
+/* controller's ip address */
 static char g_controller_ip[128] = "";
+
+/* controller's port number */
 static int g_controller_port = 0;
 
-/*  */
+/* allocate message buffer */
 inline char*
 msgbuf_allocate(size_t capacity)
 {
@@ -41,7 +47,7 @@ msgbuf_allocate(size_t capacity)
 	return buf + sizeof(size_t);
 }
 
-/*  */
+/* free message buffer */
 inline void
 msgbuf_free(char* msgbuf)
 {
@@ -49,14 +55,14 @@ msgbuf_free(char* msgbuf)
 		free(msgbuf - sizeof(size_t));
 }
 
-/*  */
+/* get message buffer capacity */
 inline size_t
 msgbuf_get_capacity(const char *msgbuf)
 {
 	return *((const size_t *)(msgbuf - sizeof(size_t)));
 }
 
-/*  */
+/* re-allocate message buffer */
 inline char*
 msgbuf_reallocate(char *msgbuf, size_t required_len)
 {
@@ -76,7 +82,7 @@ msgbuf_reallocate(char *msgbuf, size_t required_len)
 	return new_msgbuf;
 }
 
-/*  */
+/* append message to buffer */
 inline char*
 msgbuf_append(char *msgbuf, const char *append, size_t append_len)
 {
@@ -96,7 +102,7 @@ msgbuf_append(char *msgbuf, const char *append, size_t append_len)
 	return new_msgbuf;
 }
 
-/*  */
+/* remove message from front */
 inline char*
 msgbuf_remove_front(char *msgbuf, size_t remove_len)
 {
@@ -111,7 +117,7 @@ msgbuf_remove_front(char *msgbuf, size_t remove_len)
 	return memmove(msgbuf, msgbuf + remove_len, new_len + 1);
 }
 
-/*  */
+/* connect to controller */
 static int
 connect_to_controller(int *sock)
 {
@@ -122,7 +128,9 @@ connect_to_controller(int *sock)
 	if (likely(*sock >=0))
 		return 0;
 
+	/* create socket */
 	if (*sock < 0) {
+		RTE_LOG(INFO, SPP_COMMAND_PROC, "Creating socket...\n");
 		*sock = socket(AF_INET, SOCK_STREAM, 0);
 		if (*sock < 0) {
 			RTE_LOG(ERR, SPP_COMMAND_PROC, 
@@ -136,6 +144,8 @@ connect_to_controller(int *sock)
 		controller_addr.sin_port = htons(g_controller_port);
 	}
 
+	/* connect to */
+	RTE_LOG(INFO, SPP_COMMAND_PROC, "Trying to connect ... socket=%d\n", *sock);
 	ret = connect(*sock, (struct sockaddr *)&controller_addr,
 			sizeof(controller_addr));
 	if (ret < 0) {
@@ -144,15 +154,18 @@ connect_to_controller(int *sock)
 		return -1;
 	}
 
+	RTE_LOG(INFO, SPP_COMMAND_PROC, "Connected\n");
+
+	/* set non-blocking */
 	sock_flg = fcntl(*sock, F_GETFL, 0);
 	fcntl(*sock, F_SETFL, sock_flg | O_NONBLOCK);
 
 	return 0;
 }
 
-/*  */
+/* receive message */
 static int
-receive_request(int *sock, char **msgbuf)
+receive_message(int *sock, char **msgbuf)
 {
 	int ret = -1;
 	int n_rx = 0;
@@ -162,16 +175,23 @@ receive_request(int *sock, char **msgbuf)
 	size_t rx_buf_sz = MESSAGE_BUFFER_BLOCK_SIZE;
 
 	ret = recv(*sock, rx_buf, rx_buf_sz, 0);
+	RTE_LOG(DEBUG, SPP_COMMAND_PROC, "Receive message. count=%d\n", ret);
 	if (ret <= 0) {
 		if (ret == 0) {
-
-		} else {
-			if (errno != EAGAIN && errno != EWOULDBLOCK) {
-				RTE_LOG(ERR, SPP_COMMAND_PROC,
-						"Cannot receive from socket. errno=%d\n", errno);
-			}
+			RTE_LOG(INFO, SPP_COMMAND_PROC,
+					"Controller has performed an shutdown.");
+		} else if (errno == EAGAIN || errno == EWOULDBLOCK) {
+			/* no receive message */
 			return 0;
+		} else {
+			RTE_LOG(ERR, SPP_COMMAND_PROC,
+					"Receive failure. errno=%d\n", errno);
 		}
+
+		RTE_LOG(INFO, SPP_COMMAND_PROC, "Assume Server closed connection\n");
+		close(*sock);
+		*sock = -1;
+		return -1;
 	}
 
 	n_rx = ret;
@@ -186,14 +206,27 @@ receive_request(int *sock, char **msgbuf)
 	return n_rx;
 }
 
-/*  */
+/* send message */
 static int
-send_response(void)
+send_message(int *sock, const char* message, size_t message_len)
 {
+	int ret = -1;
+
+	ret = send(*sock, message, message_len, 0);
+	if (unlikely(ret == -1)) {
+		RTE_LOG(ERR, SPP_COMMAND_PROC, "Send failure. ret=%d\n", ret);
+		return -1;
+	}
+
 	return 0;
 }
 
-////////////////////////////////////////////////////////////////////////////////
+
+/*******************************************************************************
+ *
+ * process command request(json string)
+ *
+ ******************************************************************************/
 
 #define CMD_MAX_COMMANDS 32
 
@@ -201,9 +234,21 @@ send_response(void)
 
 #define CMD_CLASSIFIER_TABLE_VALUE_BUFSZ 62
 
+#define CMD_UNUSE "unuse"
+
 #define component_type spp_core_type
 
-/* command type */
+/* decode error code */
+enum decode_error_code {
+	DERR_BAD_FORMAT = 1,
+	DERR_UNKNOWN_COMMAND,
+	DERR_NO_PARAM,
+	DERR_BAD_TYPE,
+	DERR_BAD_VALUE,
+};
+
+/* command type
+	do it same as the order of COMMAND_TYPE_STRINGS */
 enum command_type {
 	CMDTYPE_ADD,
 	CMDTYPE_COMPONENT,
@@ -215,7 +260,8 @@ enum command_type {
 	CMDTYPE_PROCESS,
 };
 
-/* command type string list */
+/* command type string list
+	do it same as the order of enum command_type */
 static const char *COMMAND_TYPE_STRINGS[] = {
 	"add",
 	"component",
@@ -227,20 +273,19 @@ static const char *COMMAND_TYPE_STRINGS[] = {
 	/* termination */ "",
 };
 
-/* classifier type */
-enum classifier_type {
-	CLASSIFIERTYPE_MAC,	
-};
-
-/* classifier type string list */
+/* classifier type string list
+	do it same as the order of enum spp_classifier_type (spp_vf.h) */
 static const char *CLASSIFILER_TYPE_STRINGS[] = {
+	"none",
 	"mac",
 
 	/* termination */ "",
 };
 
+#if 0 /* not supported */
 /* "add" command parameters */
 struct add_command {
+	int num_port;
 	struct spp_config_port_info ports[RTE_MAX_ETHPORTS];
 };
 
@@ -248,32 +293,36 @@ struct add_command {
 struct component_command {
 	enum component_type type;
 	unsigned int core_id;
+	int num_rx_port;
+	int num_tx_port;
 	struct spp_config_port_info rx_ports[RTE_MAX_ETHPORTS];
 	struct spp_config_port_info tx_ports[RTE_MAX_ETHPORTS];
 };
+#endif
 
 /* "classifier_table" command specific parameters */
 struct classifier_table_command {
-	enum classifier_type type;
+	enum spp_classifier_type type;
 	char value[CMD_CLASSIFIER_TABLE_VALUE_BUFSZ];
 	struct spp_config_port_info port;
 };
 
-#if 0
 /* "flush" command specific parameters */
 struct flush_command {
 	/* nothing specific */
 };
-#endif
 
 /* command parameters */
 struct command {
 	enum command_type type;
 
 	union {
+#if 0 /* not supported */
 		struct add_command add;
 		struct component_command component;
+#endif
 		struct classifier_table_command classifier_table;
+		struct flush_command flush;
 	} spec;
 };
 
@@ -296,16 +345,13 @@ struct json_value_decode_rule {
 	json_type json_type;
 	size_t offset;
 	json_value_decode_proc decode_proc;
-#if 0
-	union {
-		size_t buf_sz;
-	} spec;
 
-	json_type sub_json_type;
-	const struct json_value_decode_rule *sub_rules;
-#endif
-	size_t sub_offset;
-	size_t sub_offset_num;
+	struct {
+		json_type json_type;
+		size_t element_sz;
+		size_t offset_num;
+		size_t offset_num_valid;
+	} array;
 };
 
 /* get output address for decoded json value */
@@ -340,8 +386,9 @@ decode_##proc_name##_value(void *output, const json_t *value_obj,		\
 DECODE_ENUM_VALUE(command_type, enum command_type, COMMAND_TYPE_STRINGS)
 
 /* enum value decode procedure for "classifier_type" */
-DECODE_ENUM_VALUE(classifier_type, enum classifier_type, CLASSIFILER_TYPE_STRINGS)
+DECODE_ENUM_VALUE(classifier_type, enum spp_classifier_type, CLASSIFILER_TYPE_STRINGS)
 
+#if 0 /* not supported */
 /* decode procedure for integer */
 static int
 decode_int_value(void *output, const json_t *value_obj,
@@ -359,14 +406,27 @@ decode_string_value(void *output, const json_t *value_obj,
 		__rte_unused const struct json_value_decode_rule *rule)
 {
 	const char* str_val = json_string_value(value_obj);
-#if 0
-	size_t len = strlen(str_val);
-	if (unlikely(len >= rule->spec.buf_sz)) {
-		RTE_LOG(ERR, SPP_COMMAND_PROC, "Invalid json value. "
-				"name=%s\n", rule->name);
-		return -1;
-	}
+	strcpy(output, str_val);
+
+	return 0;
+}
 #endif
+
+/* decode procedure for mac address string */
+static int
+decode_mac_addr_str_value(void *output, const json_t *value_obj,
+		__rte_unused const struct json_value_decode_rule *rule)
+{
+	int ret = -1;
+	const char* str_val = json_string_value(value_obj);
+
+	ret = spp_config_change_mac_str_to_int64(str_val);
+	if (unlikely(ret == -1)) {
+		RTE_LOG(ERR, SPP_COMMAND_PROC, "Bad mac address string. val=%s\n",
+				str_val);
+		return DERR_BAD_VALUE;
+	}
+
 	strcpy(output, str_val);
 
 	return 0;
@@ -378,13 +438,20 @@ decode_port_value(void *output, const json_t *value_obj,
 		__rte_unused const struct json_value_decode_rule *rule)
 {
 	int ret = -1;
+	const char* str_val = json_string_value(value_obj);
 	struct spp_config_port_info *port = (struct spp_config_port_info *)output;
 
-	const char* str_val = json_string_value(value_obj);
+	if (strcmp(str_val, CMD_UNUSE) == 0) {
+		port->if_type = UNDEF;
+		port->if_no = 0;
+		return 0;
+	}
 
 	ret = spp_config_get_if_info(str_val, &port->if_type, &port->if_no);
-	if (unlikely(ret != 0))
-		return -1;
+	if (unlikely(ret != 0)) {
+		RTE_LOG(ERR, SPP_COMMAND_PROC, "Bad port. val=%s\n", str_val);
+		return DERR_BAD_VALUE;
+	}
 
 	return 0;
 }
@@ -405,25 +472,56 @@ decode_json_object(void *output, const json_t *parent_obj,
 	for (i = 0; unlikely(! IS_END_OF_DECODE_RULE(&rules[i])); ++ i) {
 		rule = rules + 1;
 
+		RTE_LOG(DEBUG, SPP_COMMAND_PROC, "get one object. name=%s\n",
+				rule->name);
+
 		value_obj = json_object_get(parent_obj, rule->name);
-		if (unlikely(value_obj == NULL) || 
-				unlikely(json_typeof(value_obj) != rule->json_type)) {
-			RTE_LOG(ERR, SPP_COMMAND_PROC, "Invalid json value. "
+		if (unlikely(value_obj == NULL)) {
+			RTE_LOG(ERR, SPP_COMMAND_PROC, "No parameter. "
 					"name=%s\n", rule->name);
-			return -1;
+			return DERR_NO_PARAM;
+		} else if (unlikely(json_typeof(value_obj) != rule->json_type)) {
+			RTE_LOG(ERR, SPP_COMMAND_PROC, "Bad value type. "
+					"name=%s\n", rule->name);
+			return DERR_BAD_TYPE;
 		}
 
 		switch (rule->json_type) {
 		case JSON_ARRAY:
+			RTE_LOG(DEBUG, SPP_COMMAND_PROC, "Decode array. num=%lu\n",
+					json_array_size(value_obj));
+
+			*(int *)((char *)output + rule->array.offset_num) = 
+					(int)json_array_size(value_obj);
+
 			json_array_foreach(value_obj, n, obj) {
-				sub_output = DR_GET_OUTPUT(output, rule) + (rule->sub_offset * i);
+				RTE_LOG(DEBUG, SPP_COMMAND_PROC, "Decode array element. "
+						"index=%d\n", i);
+				
+				if (unlikely(json_typeof(obj) != rule->array.json_type)) {
+					RTE_LOG(ERR, SPP_COMMAND_PROC, "Bad value type. "
+							"name=%s, index=%d\n", rule->name, i);
+					return DERR_BAD_TYPE;
+				}
+
+				sub_output = DR_GET_OUTPUT(output, rule) + 
+						(rule->array.element_sz * i);
 				ret = (*rule->decode_proc)(sub_output, obj, rule);
+				if (unlikely(ret != 0)) {
+					RTE_LOG(ERR, SPP_COMMAND_PROC, "Bad value. "
+							"name=%s, index=%d\n", rule->name, i);
+					return ret;
+				}
 			}
-			*(int *)((char *)output + rule->sub_offset_num) = n;
 			break;
 		default:
 			sub_output = DR_GET_OUTPUT(output, rule);
 			ret = (*rule->decode_proc)(sub_output, value_obj, rule);
+			if (unlikely(ret != 0)) {
+				RTE_LOG(ERR, SPP_COMMAND_PROC, "Bad value. "
+						"name=%s\n", rule->name);
+				return ret;
+			}
 			break;
 		}
 	}
@@ -431,7 +529,7 @@ decode_json_object(void *output, const json_t *parent_obj,
 	return 0;
 }
 
-/*  */
+/* decode rule for command-base */
 const struct json_value_decode_rule DECODERULE_COMMAND_BASE[] = {
 	{
 		.name = "command",
@@ -442,20 +540,24 @@ const struct json_value_decode_rule DECODERULE_COMMAND_BASE[] = {
 	END_OF_DECODE_RULE
 };
 
-/*  */
+#if 0 /* not supported */
+/* decode rule for add-command-spec */
 const struct json_value_decode_rule DECODERULE_ADD_COMMAND[] = {
 	{
 		.name = "ports",
 		.json_type = JSON_ARRAY,
 		.offset = offsetof(struct add_command, ports),
 		.decode_proc = decode_port_value,
-//		.sub_json_type = JSON_STRING,
-		.sub_offset = sizeof(struct spp_config_port_info),
+
+		.array.element_sz = sizeof(struct spp_config_port_info),
+		.array.json_type = JSON_STRING,
+		.array.offset_num = offsetof(struct add_command, num_port),
 	},
 	END_OF_DECODE_RULE
 };
+#endif
 
-/*  */
+/* decode rule for classifier-table-command-spec */
 const struct json_value_decode_rule DECODERULE_CLASSIFIER_TABLE_COMMAND[] = {
 	{
 		.name = "type",
@@ -466,7 +568,7 @@ const struct json_value_decode_rule DECODERULE_CLASSIFIER_TABLE_COMMAND[] = {
 		.name = "value",
 		.json_type = JSON_STRING,
 		.offset = offsetof(struct classifier_table_command, value),
-		.decode_proc = decode_string_value,
+		.decode_proc = decode_mac_addr_str_value,
 	},{
 		.name = "port",
 		.json_type = JSON_STRING,
@@ -476,7 +578,7 @@ const struct json_value_decode_rule DECODERULE_CLASSIFIER_TABLE_COMMAND[] = {
 	END_OF_DECODE_RULE
 };
 
-/*  */
+/* decode procedure for command */
 static int
 decode_command_object(void* output, const json_t *parent_obj,
 		__rte_unused const struct json_value_decode_rule *rule)
@@ -485,52 +587,58 @@ decode_command_object(void* output, const json_t *parent_obj,
 	struct command *command = (struct command *)output;
 	const struct json_value_decode_rule *spec_rules = NULL;
 
-	/* decode command base */
+	/* decode command-base */
 	ret = decode_json_object(command, parent_obj, DECODERULE_COMMAND_BASE);
 	if (unlikely(ret != 0)) {
-		// TODO:コマンドがデコード失敗
-		return -1;
+		RTE_LOG(ERR, SPP_COMMAND_PROC, "Bad command. ret=%d\n", ret);
+		return ret;
 	}
 
-	/* decode command specific */
+	/* decode command-specific */
 	switch (command->type) {
 		case CMDTYPE_CLASSIFIER_TABLE:
 			spec_rules = DECODERULE_CLASSIFIER_TABLE_COMMAND;
 			break;
 
 		case CMDTYPE_FLUSH:
+			/* nothing specific */
 			break;
 
 		default:
-			break;
+			/* unknown command */
+			RTE_LOG(ERR, SPP_COMMAND_PROC, "Unknown command. type=%d\n",
+					command->type);
+			return DERR_UNKNOWN_COMMAND;
 	}
 
 	if (likely(spec_rules != NULL)) {
 		ret = decode_json_object(&command->spec, parent_obj, spec_rules);
 		if (unlikely(ret != 0)) {
-			// TODO:コマンドがデコード失敗
-			return -1;
+			RTE_LOG(ERR, SPP_COMMAND_PROC, "Bad command. ret=%d\n", ret);
+			return ret;
 		}
 	}
 
 	return 0;
 }
 
-/*  */
+/* decode rule for command request */
 const struct json_value_decode_rule DECODERULE_REQUEST[] = {
 	{
 		.name = "commands",
 		.json_type = JSON_ARRAY,
 		.offset = offsetof(struct request, commands),
 		.decode_proc = decode_command_object,
-//		.sub_json_type = JSON_OBJECT,
-		.sub_offset = sizeof(struct command),
-		.sub_offset_num = offsetof(struct request, num_command),
+
+		.array.element_sz = sizeof(struct command),
+		.array.json_type = JSON_OBJECT,
+		.array.offset_num = offsetof(struct request, num_command),
+		.array.offset_num_valid = offsetof(struct request, num_valid_command),
 	},
 	END_OF_DECODE_RULE
 };
 
-/*  */
+/* decode request from no-null-terminated string */
 static int
 decode_request(struct request *request, const char *request_str, size_t request_str_len)
 {
@@ -544,7 +652,7 @@ decode_request(struct request *request, const char *request_str, size_t request_
 		RTE_LOG(ERR, SPP_COMMAND_PROC, "Cannot parse command request. "
 				"error=%s, request_str=%.*s\n", 
 				json_error.text, (int)request_str_len, request_str);
-		return -1;
+		return DERR_BAD_FORMAT;
 	}
 
 	/* decode request object */
@@ -553,13 +661,13 @@ decode_request(struct request *request, const char *request_str, size_t request_
 		RTE_LOG(ERR, SPP_COMMAND_PROC, "Cannot decode command request. "
 				"ret=%d, request_str=%.*s\n", 
 				ret, (int)request_str_len, request_str);
-		return -1;
+		return ret;
 	}
 
 	return 0;
 }
 
-/*  */
+/* execute one command */
 static int
 execute_command(const struct command *command)
 {
@@ -567,29 +675,33 @@ execute_command(const struct command *command)
 
 	switch (command->type) {
 	case CMDTYPE_CLASSIFIER_TABLE:
+		RTE_LOG(DEBUG, SPP_COMMAND_PROC, "Execute classifier_table command.");
 		ret = spp_update_classifier_table(
-				SPP_CLASSIFIER_TYPE_MAC,
-//				command->spec.classifier_table.type,
+				command->spec.classifier_table.type,
 				command->spec.classifier_table.value,
 				&command->spec.classifier_table.port);
 		break;
 
 	case CMDTYPE_FLUSH:
+		RTE_LOG(DEBUG, SPP_COMMAND_PROC, "Execute flush command.");
 		ret = spp_flush();
 		break;
 
 	case CMDTYPE_PROCESS:
+		RTE_LOG(DEBUG, SPP_COMMAND_PROC, "Execute process command.");
+		ret = spp_get_process_id();
 		break;
 
 	default:
+		RTE_LOG(ERR, SPP_COMMAND_PROC, "Unknown command. type=%d\n", command->type);
 		ret = 0;
 		break;
 	}
 
-	return 0;
+	return ret;
 }
 
-/*  */
+/* process command request from no-null-terminated string */
 static int
 process_request(const char *request_str, size_t request_str_len)
 {
@@ -597,19 +709,27 @@ process_request(const char *request_str, size_t request_str_len)
 	int i;
 
 	struct request request;
-
-	RTE_LOG(DEBUG, SPP_COMMAND_PROC, "Receive command request. "
-			"request_str=%.*s\n", (int)request_str_len, request_str);
-
 	memset(&request, 0, sizeof(struct request));
 
+	RTE_LOG(DEBUG, SPP_COMMAND_PROC, "Start command request processing. "
+			"request_str=%.*s\n", (int)request_str_len, request_str);
+
 	ret = decode_request(&request, request_str, request_str_len);
-	if (unlikely(ret != 0))
-		return -1;
+	if (unlikely(ret != 0)) {
+		RTE_LOG(DEBUG, SPP_COMMAND_PROC, "Failed to process command request. "
+		"ret=%d\n", ret);
+		return ret;
+	}
+
+	RTE_LOG(DEBUG, SPP_COMMAND_PROC, "Decoded command request. "
+			"num_command=%d, num_valid_command=%d\n",
+			request.num_command, request.num_valid_command);
 
 	for (i = 0; i < request.num_command ; ++i) {
 		ret = execute_command(request.commands + i);
 	}
+
+	RTE_LOG(DEBUG, SPP_COMMAND_PROC, "Succeeded to process command request.\n");
 
 	return 0;
 }
@@ -645,7 +765,7 @@ spp_command_proc_do(void)
 	if (unlikely(ret != 0))
 		return;
 
-	ret = receive_request(&sock, &msgbuf);
+	ret = receive_message(&sock, &msgbuf);
 	if (likely(ret == 0)) {
 		return;
 	}
