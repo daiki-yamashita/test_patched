@@ -471,7 +471,7 @@ decode_json_object(void *output, const json_t *parent_obj,
 	void *sub_output;
 
 	for (i = 0; unlikely(! IS_END_OF_DECODE_RULE(&rules[i])); ++ i) {
-		rule = rules + 1;
+		rule = rules + i;
 
 		RTE_LOG(DEBUG, SPP_COMMAND_PROC, "get one object. name=%s\n",
 				rule->name);
@@ -497,20 +497,20 @@ decode_json_object(void *output, const json_t *parent_obj,
 
 			json_array_foreach(value_obj, n, obj) {
 				RTE_LOG(DEBUG, SPP_COMMAND_PROC, "Decode array element. "
-						"index=%d\n", i);
+						"index=%d\n", n);
 				
 				if (unlikely(json_typeof(obj) != rule->array.json_type)) {
 					RTE_LOG(ERR, SPP_COMMAND_PROC, "Bad value type. "
-							"name=%s, index=%d\n", rule->name, i);
+							"name=%s, index=%d\n", rule->name, n);
 					return DERR_BAD_TYPE;
 				}
 
 				sub_output = DR_GET_OUTPUT(output, rule) + 
-						(rule->array.element_sz * i);
+						(rule->array.element_sz * n);
 				ret = (*rule->decode_proc)(sub_output, obj, rule);
 				if (unlikely(ret != 0)) {
 					RTE_LOG(ERR, SPP_COMMAND_PROC, "Bad value. "
-							"name=%s, index=%d\n", rule->name, i);
+							"name=%s, index=%d\n", rule->name, n);
 					return ret;
 				}
 			}
