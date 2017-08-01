@@ -749,6 +749,7 @@ void
 spp_command_proc_do(void)
 {
 	int ret = -1;
+	int msg_ret = -1;
 	int i;
 
 	static int sock = -1;
@@ -765,12 +766,12 @@ spp_command_proc_do(void)
 	if (unlikely(ret != 0))
 		return;
 
-	ret = receive_message(&sock, &msgbuf);
-	if (likely(ret == 0)) {
+	msg_ret = receive_message(&sock, &msgbuf);
+	if (likely(msg_ret == 0)) {
 		return;
 	}
 
-	for (i = 0; i < ret; ++i) {
+	for (i = 0; i < msg_ret; ++i) {
 		switch (*(msgbuf + msg_len + i)) {
 		case '{':
 			++lb_cnt;
@@ -785,9 +786,12 @@ spp_command_proc_do(void)
 			ret = process_request(msgbuf, msg_len);
 
 			msgbuf_remove_front(msgbuf, msg_len);
+			msg_ret = 0;
 			msg_len = 0;
 			rb_cnt = 0;
 			lb_cnt = 0;
 		}
 	}
+
+	msg_len = msg_len + msg_ret;
 }
