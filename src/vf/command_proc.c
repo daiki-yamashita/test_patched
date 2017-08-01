@@ -42,6 +42,7 @@ msgbuf_allocate(size_t capacity)
 	if (unlikely(buf == NULL))
 		return NULL;
 
+	memset(buf, 0x00, capacity + sizeof(size_t));
 	*((size_t *)buf) = capacity;
 
 	return buf + sizeof(size_t);
