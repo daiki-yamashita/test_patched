@@ -768,7 +768,7 @@ spp_command_proc_do(void)
 		return;
 
 	msg_ret = receive_message(&sock, &msgbuf);
-	if (likely(msg_ret == 0)) {
+	if (likely(msg_ret <= 0)) {
 		return;
 	}
 
