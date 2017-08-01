@@ -329,16 +329,20 @@ static int
 parse_app_server(const char *server_str, char *server_ip, int *server_port)
 {
 	const char delim[2] = ":";
-	int pos = 0;
+	unsigned int pos = 0;
 	int port = 0;
 	char *endptr = NULL;
 
 	pos = strcspn(server_str, delim);
+	if (pos >= strlen(server_str))
+		return -1;
+
 	port = strtol(&server_str[pos+1], &endptr, 0);
 	if (unlikely(&server_str[pos+1] == endptr) || unlikely(*endptr != '\0'))
 		return -1;
 
 	memcpy(server_ip, server_str, pos);
+	server_ip[pos] = '\0';
 	*server_port = port;
 	RTE_LOG(DEBUG, APP, "Set server ip   = %s\n", server_ip);
 	RTE_LOG(DEBUG, APP, "Set server port = %d\n", *server_port);
