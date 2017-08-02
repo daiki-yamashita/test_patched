@@ -359,6 +359,8 @@ static int
 parse_app_args(int argc, char *argv[])
 {
 	int cnt;
+	int proc_flg = 0;
+	int server_flg = 0;
 	int option_index, opt;
 	const int argcopt = argc;
 	char *argvopt[argcopt];
@@ -392,6 +394,7 @@ parse_app_args(int argc, char *argv[])
 				usage(progname);
 				return -1;
 			}
+			proc_flg = 1;
 			break;
 		case 's':
 			if (parse_app_server(optarg, g_startup_param.server_ip,
@@ -399,6 +402,7 @@ parse_app_args(int argc, char *argv[])
 				usage(progname);
 				return -1;
 			}
+			server_flg = 1;
 			break;
 		default:
 			usage(progname);
@@ -407,6 +411,11 @@ parse_app_args(int argc, char *argv[])
 		}
 	}
 
+	/* Check mandatory parameters */
+	if ((proc_flg == 0) || (server_flg == 0)) {
+		usage(progname);
+		return -1;
+	}
 	RTE_LOG(INFO, APP, "application arguments value. (process id = %d, config = %s, server = %s:%d)\n",
 			g_startup_param.process_id,
 			config_file_path,
