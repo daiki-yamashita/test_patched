@@ -317,6 +317,9 @@ parse_app_process_id(const char *process_id_str, int *process_id)
 	if (unlikely(process_id_str == endptr) || unlikely(*endptr != '\0'))
 		return -1;
 
+	if (id >= SPP_PROCESS_MAX)
+		return -1;
+
 	*process_id = id;
 	RTE_LOG(DEBUG, APP, "Set process id = %d\n", *process_id);
 	return 0;
