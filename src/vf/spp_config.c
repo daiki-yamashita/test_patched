@@ -25,13 +25,63 @@
 #define JSONPATH_TX_TABLE   "$.tx_port_table"
 
 /*
+ * Instead of json_path_get
+ */
+json_t *
+spp_config_get_path_obj(const json_t *json, const char *path)
+{
+	const json_t *obj, *array_obj;
+	json_t *new_obj = NULL;
+	char buf[SPP_CONFIG_PATH_LEN];
+	char *str, *token, *bracket, *endptr;
+	int index = 0;
+
+	if (unlikely(path[0] != '$') || unlikely(path[1] != '.') ||
+			unlikely(strlen(path) >= SPP_CONFIG_PATH_LEN))
+		return NULL;
+
+	strcpy(buf, path);
+	obj = json;
+	str = buf+1;
+	while(str != NULL) {
+		token = str+1;
+		str = strpbrk(token, ".");
+		if (str != NULL)
+			*str = '\0';
+
+		bracket = strpbrk(token, "[");
+		if (bracket != NULL)
+			*bracket = '\0';
+
+		new_obj = json_object_get(obj, token);
+		if (new_obj == NULL)
+			return NULL;
+
+		if (bracket != NULL) {
+			index = strtol(bracket+1, &endptr, 0);
+			if (unlikely(str == endptr) || unlikely(*endptr != ']'))
+				return NULL;
+
+			array_obj = new_obj;
+			new_obj = json_array_get(array_obj, index);
+			if (new_obj == NULL)
+				return NULL;
+		}
+
+		obj = new_obj;
+	}
+
+	return new_obj;
+}
+
+/*
  * Get integer data from config
  */
 static int
 config_get_int_value(const json_t *obj, const char *path, int *value)
 {
 	/* 指定パラメータのJsonオブジェクト取得 */
-	json_t *tmp_obj = json_path_get(obj, path);
+	json_t *tmp_obj = spp_config_get_path_obj(obj, path);
 	if (unlikely(tmp_obj == NULL)) {
 		/* 必須でないデータを取得する場合を考慮し、DEBUGログとする。 */
 		RTE_LOG(DEBUG, APP, "No parameter. (path = %s)\n", path);
@@ -58,7 +108,7 @@ static int
 config_get_str_value(const json_t *obj, const char *path, char *value)
 {
 	/* 指定パラメータのJsonオブジェクト取得 */
-	json_t *tmp_obj = json_path_get(obj, path);
+	json_t *tmp_obj = spp_config_get_path_obj(obj, path);
 	if (unlikely(tmp_obj == NULL)) {
 		RTE_LOG(DEBUG, APP, "No parameter. (path = %s)\n", path);
 		return -1;
@@ -204,7 +254,7 @@ config_load_classifier_table(const json_t *obj,
 		struct spp_config_classifier_table *classifier_table)
 {
 	/* classifier_table用オブジェクト取得 */
-	json_t *classifier_obj = json_path_get(obj, JSONPATH_CLASSIFIER_TABLE);
+	json_t *classifier_obj = spp_config_get_path_obj(obj, JSONPATH_CLASSIFIER_TABLE);
 	if (unlikely(classifier_obj == NULL)) {
 		RTE_LOG(INFO, APP, "No classifier table.\n");
 		return 0;
@@ -219,7 +269,7 @@ config_load_classifier_table(const json_t *obj,
 	}
 
 	/* table用オブジェクト取得 */
-	json_t *array_obj = json_path_get(classifier_obj, JSONPATH_TABLE);
+	json_t *array_obj = spp_config_get_path_obj(classifier_obj, JSONPATH_TABLE);
 	if (unlikely(!array_obj)) {
 		RTE_LOG(ERR, APP, "Json object get failed. (path = %s)\n",
 				JSONPATH_TABLE);
@@ -338,7 +388,7 @@ config_set_rx_port(enum spp_core_type type, json_t *obj,
 	if (type == SPP_CONFIG_MERGE) {
 		/* Merge */
 		/* 受信ポート用オブジェクト取得 */
-		json_t *array_obj = json_path_get(obj, JSONPATH_RX_PORT);
+		json_t *array_obj = spp_config_get_path_obj(obj, JSONPATH_RX_PORT);
 		if (unlikely(!array_obj)) {
 			RTE_LOG(ERR, APP, "Json object get failed. (path = %s, route = merge)\n",
 				JSONPATH_RX_PORT);
@@ -454,7 +504,7 @@ config_set_tx_port(enum spp_core_type type, json_t *obj,
 		}
 	} else {
 		/* Classifier */
-		json_t *table_obj = json_path_get(obj, JSONPATH_TX_TABLE);
+		json_t *table_obj = spp_config_get_path_obj(obj, JSONPATH_TX_TABLE);
 		if (unlikely(table_obj != NULL)) {
 			/* Classifier Tableから取得 */
 			functions->num_tx_port = classifier_table->num_table;
@@ -473,7 +523,7 @@ config_set_tx_port(enum spp_core_type type, json_t *obj,
 		{
 			/* tx_portパラメータより取得 */
 			/* 送信ポート用オブジェクト取得 */
-			json_t *array_obj = json_path_get(obj, JSONPATH_TX_PORT);
+			json_t *array_obj = spp_config_get_path_obj(obj, JSONPATH_TX_PORT);
 			if (unlikely(array_obj == NULL)) {
 				RTE_LOG(ERR, APP, "Json object get failed. (path = %s, route = classifier)\n",
 					JSONPATH_TX_PORT);
@@ -545,7 +595,7 @@ config_load_proc_info(const json_t *obj, int node_id, struct spp_config_area *co
 	struct spp_config_classifier_table *classifier_table = &config->classifier_table;
 
 	/* proc_table用オブジェクト取得 */
-	json_t *proc_table_obj = json_path_get(obj, JSONPATH_PROC_TABLE);
+	json_t *proc_table_obj = spp_config_get_path_obj(obj, JSONPATH_PROC_TABLE);
 	if (unlikely(proc_table_obj == NULL)) {
 		RTE_LOG(ERR, APP, "Json object get failed. (path = %s)\n",
 				JSONPATH_PROC_TABLE);
@@ -599,7 +649,7 @@ config_load_proc_info(const json_t *obj, int node_id, struct spp_config_area *co
 	}
 
 	/* functions用オブジェクト取得 */
-	json_t *array_obj = json_path_get(proc_obj, JSONPATH_FUNCTIONS);
+	json_t *array_obj = spp_config_get_path_obj(proc_obj, JSONPATH_FUNCTIONS);
 	if (unlikely(!array_obj)) {
 		RTE_LOG(ERR, APP, "Json object get failed. (path = %s)\n",
 				JSONPATH_FUNCTIONS);
