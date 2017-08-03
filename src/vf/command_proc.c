@@ -256,6 +256,9 @@ send_decode_error_response(int *sock, const struct spp_command_request *request,
 	msg = json_dumps(top_obj, JSON_INDENT(2));
 	json_decref(top_obj);
 
+	RTE_LOG(INFO, SPP_COMMAND_PROC, "Make command response (decode error). "
+			"response_str=\n%s\n", msg);
+
 	/* send response to requester */
 	ret = spp_send_message(sock, msg, strlen(msg));
 	if (unlikely(ret != 0)) {
@@ -303,10 +306,13 @@ send_command_result_response(int *sock, const struct spp_command_request *reques
 	msg = json_dumps(top_obj, JSON_INDENT(2));
 	json_decref(top_obj);
 
+	RTE_LOG(INFO, SPP_COMMAND_PROC, "Make command response (command result). "
+			"response_str=\n%s\n", msg);
+
 	/* send response to requester */
 	ret = spp_send_message(sock, msg, strlen(msg));
 	if (unlikely(ret != 0)) {
-		RTE_LOG(ERR, SPP_COMMAND_PROC, "Failed to send decode error response.");
+		RTE_LOG(ERR, SPP_COMMAND_PROC, "Failed to send command result response.");
 		/* not return */
 	}
 
@@ -329,7 +335,7 @@ process_request(int *sock, const char *request_str, size_t request_str_len)
 	memset(command_results, 0, sizeof(command_results));
 
 	RTE_LOG(INFO, SPP_COMMAND_PROC, "Start command request processing. "
-			"request_str=%.*s\n", (int)request_str_len, request_str);
+			"request_str=\n%.*s\n", (int)request_str_len, request_str);
 
 	/* decode request message */
 	ret = spp_command_decode_request(

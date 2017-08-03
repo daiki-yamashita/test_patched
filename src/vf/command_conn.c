@@ -89,7 +89,6 @@ spp_receive_message(int *sock, char **strbuf)
 	size_t rx_buf_sz = MESSAGE_BUFFER_BLOCK_SIZE;
 
 	ret = recv(*sock, rx_buf, rx_buf_sz, 0);
-	RTE_LOG(DEBUG, SPP_COMMAND_PROC, "Receive message. count=%d\n", ret);
 	if (ret <= 0) {
 		if (ret == 0) {
 			RTE_LOG(INFO, SPP_COMMAND_PROC,
@@ -108,6 +107,7 @@ spp_receive_message(int *sock, char **strbuf)
 		return -1;
 	}
 
+	RTE_LOG(DEBUG, SPP_COMMAND_PROC, "Receive message. count=%d\n", ret);
 	n_rx = ret;
 
 	new_strbuf = spp_strbuf_append(*strbuf, rx_buf, n_rx);
