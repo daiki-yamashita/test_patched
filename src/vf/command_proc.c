@@ -244,6 +244,10 @@ send_decode_error_response(int *sock, const struct spp_command_request *request,
 		return;
 	}
 
+	/* **
+	 * output order of object in string is inverse to addition order
+	 * **/
+
 	/* create & append result array */
 	ret = append_response_decode_results_object(top_obj, request, decode_error);
 	if (unlikely(ret != 0)) {
@@ -284,13 +288,9 @@ send_command_result_response(int *sock, const struct spp_command_request *reques
 		return;
 	}
 
-	/* create & append result array */
-	ret = append_response_command_results_object(top_obj, request, command_results);
-	if (unlikely(ret != 0)) {
-		RTE_LOG(ERR, SPP_COMMAND_PROC, "Failed to make command result response.");
-		json_decref(top_obj);
-		return;
-	}
+	/* **
+	 * output order of object in string is inverse to addition order
+	 * **/
 
 	/* append process information value */
 	if (request->is_requested_process) {
@@ -300,6 +300,14 @@ send_command_result_response(int *sock, const struct spp_command_request *reques
 			json_decref(top_obj);
 			return;
 		}
+	}
+
+	/* create & append result array */
+	ret = append_response_command_results_object(top_obj, request, command_results);
+	if (unlikely(ret != 0)) {
+		RTE_LOG(ERR, SPP_COMMAND_PROC, "Failed to make command result response.");
+		json_decref(top_obj);
+		return;
 	}
 
 	/* serialize */
