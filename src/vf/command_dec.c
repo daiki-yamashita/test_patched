@@ -347,15 +347,10 @@ decode_command_object(void* output, const json_t *parent_obj,
 			spec_rules = DECODERULE_CLASSIFIER_TABLE_COMMAND;
 			break;
 
-		case SPP_CMDTYPE_FLUSH:
-			/* nothing specific */
-			break;
-
 		default:
-			/* unknown command */
-			RTE_LOG(ERR, SPP_COMMAND_PROC, "Unknown command. type=%d\n",
-					command->type);
-			return set_decode_error(error, SPP_CMD_DERR_UNKNOWN_COMMAND, rule);
+			/* nothing specific */
+			/* (unknown command is already checked) */
+			break;
 	}
 
 	if (likely(spec_rules != NULL)) {
