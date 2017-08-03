@@ -43,20 +43,18 @@ spp_connect_to_controller(int *sock)
 		return 0;
 
 	/* create socket */
+	RTE_LOG(INFO, SPP_COMMAND_PROC, "Creating socket...\n");
+	*sock = socket(AF_INET, SOCK_STREAM, 0);
 	if (*sock < 0) {
-		RTE_LOG(INFO, SPP_COMMAND_PROC, "Creating socket...\n");
-		*sock = socket(AF_INET, SOCK_STREAM, 0);
-		if (*sock < 0) {
-			RTE_LOG(ERR, SPP_COMMAND_PROC, 
-					"Cannot create tcp socket. errno=%d\n", errno);
-			return -1;
-		}
-
-		memset(&controller_addr, 0, sizeof(controller_addr));
-		controller_addr.sin_family = AF_INET;
-		controller_addr.sin_addr.s_addr = inet_addr(g_controller_ip);
-		controller_addr.sin_port = htons(g_controller_port);
+		RTE_LOG(ERR, SPP_COMMAND_PROC, 
+				"Cannot create tcp socket. errno=%d\n", errno);
+		return -1;
 	}
+
+	memset(&controller_addr, 0, sizeof(controller_addr));
+	controller_addr.sin_family = AF_INET;
+	controller_addr.sin_addr.s_addr = inet_addr(g_controller_ip);
+	controller_addr.sin_port = htons(g_controller_port);
 
 	/* connect to */
 	RTE_LOG(INFO, SPP_COMMAND_PROC, "Trying to connect ... socket=%d\n", *sock);
@@ -65,6 +63,8 @@ spp_connect_to_controller(int *sock)
 	if (ret < 0) {
 		RTE_LOG(ERR, SPP_COMMAND_PROC,
 				"Cannot connect to controller. errno=%d\n", errno);
+		close(*sock);
+		*sock = -1;
 		return -1;
 	}
 
@@ -129,6 +129,8 @@ spp_send_message(int *sock, const char* message, size_t message_len)
 	ret = send(*sock, message, message_len, 0);
 	if (unlikely(ret == -1)) {
 		RTE_LOG(ERR, SPP_COMMAND_PROC, "Send failure. ret=%d\n", ret);
+		close(*sock);
+		*sock = -1;
 		return -1;
 	}
 
