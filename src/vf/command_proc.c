@@ -38,7 +38,7 @@ execute_command(const struct spp_command *command)
 
 	switch (command->type) {
 	case SPP_CMDTYPE_CLASSIFIER_TABLE:
-		RTE_LOG(DEBUG, SPP_COMMAND_PROC, "Execute classifier_table command.");
+		RTE_LOG(INFO, SPP_COMMAND_PROC, "Execute classifier_table command.\n");
 		ret = spp_update_classifier_table(
 				command->spec.classifier_table.type,
 				command->spec.classifier_table.value,
@@ -46,12 +46,12 @@ execute_command(const struct spp_command *command)
 		break;
 
 	case SPP_CMDTYPE_FLUSH:
-		RTE_LOG(DEBUG, SPP_COMMAND_PROC, "Execute flush command.");
+		RTE_LOG(INFO, SPP_COMMAND_PROC, "Execute flush command.\n");
 		ret = spp_flush();
 		break;
 
 	case SPP_CMDTYPE_PROCESS:
-		RTE_LOG(DEBUG, SPP_COMMAND_PROC, "Process command is requested.");
+		RTE_LOG(INFO, SPP_COMMAND_PROC, "Execute process command.\n");
 		/* nothing to do here */
 		break;
 

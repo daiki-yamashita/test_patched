@@ -109,12 +109,12 @@ init_classifier_table(struct rte_hash **classifier_table,
 		}
 
 		rte_memcpy(&eth_addr, &core_info->tx_ports[i].mac_addr, ETHER_ADDR_LEN);
+		ether_format_addr(mac_addr_str, sizeof(mac_addr_str), &eth_addr);
 
 		/* add entry to classifier mac table */
 		ret = rte_hash_add_key_data(*classifier_table,
 				(void*)&eth_addr, (void*)(long)i);
 		if (unlikely(ret < 0)) {
-			ether_format_addr(mac_addr_str, sizeof(mac_addr_str), &eth_addr);
 			RTE_LOG(ERR, SPP_CLASSIFIER_MAC,
 					"Cannot add entry to classifier mac table. "
 					"ret=%d, mac_addr=%s\n", ret, mac_addr_str);
@@ -123,7 +123,7 @@ init_classifier_table(struct rte_hash **classifier_table,
 			return -1;
 		}
 
-		RTE_LOG(DEBUG, SPP_CLASSIFIER_MAC, "Add entry to classifier mac table. "
+		RTE_LOG(INFO, SPP_CLASSIFIER_MAC, "Add entry to classifier mac table. "
 				"mac_addr=%s, if_type=%d, if_no=%d, dpdk_port=%d\n",
 				mac_addr_str, 
 				core_info->tx_ports[i].if_type, 
@@ -299,7 +299,7 @@ change_update_index(struct classifier_mac_mng_info *classifier_mng_info, unsigne
 	if (unlikely(classifier_mng_info->ref_index == 
 			classifier_mng_info->upd_index)) {
 		RTE_LOG(DEBUG, SPP_CLASSIFIER_MAC,
-				"Core[%u] Change update index.", lcore_id);
+				"Core[%u] Change update index.\n", lcore_id);
 		classifier_mng_info->upd_index = 
 				(classifier_mng_info->upd_index + 1) % 
 				NUM_CLASSIFIER_MAC_INFO;
@@ -320,7 +320,7 @@ spp_classifier_mac_update(struct spp_core_info *core_info)
 			classifier_mng_info->info + classifier_mng_info->upd_index;
 
 	RTE_LOG(INFO, SPP_CLASSIFIER_MAC,
-			"Core[%u] Start update component.", lcore_id);
+			"Core[%u] Start update component.\n", lcore_id);
 
 	/* initialize update side classifier table */
 	ret = init_classifier_table(&classifier_info->classifier_table, core_info);
@@ -338,7 +338,7 @@ spp_classifier_mac_update(struct spp_core_info *core_info)
 		rte_delay_us_block(CHANGE_UPDATE_INDEX_WAIT_INTERVAL);
 
 	RTE_LOG(INFO, SPP_CLASSIFIER_MAC,
-			"Core[%u] Complete update component.", lcore_id);
+			"Core[%u] Complete update component.\n", lcore_id);
 
 	return 0;
 }
