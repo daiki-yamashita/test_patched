@@ -59,7 +59,7 @@ spp_config_get_path_obj(const json_t *json, const char *path)
 
 		if (bracket != NULL) {
 			index = strtol(bracket+1, &endptr, 0);
-			if (unlikely(str == endptr) || unlikely(*endptr != ']'))
+			if (unlikely(bracket+1 == endptr) || unlikely(*endptr != ']'))
 				return NULL;
 
 			array_obj = new_obj;
