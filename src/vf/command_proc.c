@@ -404,8 +404,14 @@ spp_command_proc_do(void)
 	static size_t rb_cnt = 0;
 	static size_t lb_cnt = 0;
 
-	if (unlikely(msgbuf == NULL))
+	if (unlikely(msgbuf == NULL)) {
 		msgbuf = spp_strbuf_allocate(CMD_REQ_BUF_INIT_SIZE);
+		if (unlikely(msgbuf == NULL)) {
+			RTE_LOG(ERR, SPP_COMMAND_PROC,
+					"Cannot allocate memory for receive data(init).\n");
+			rte_exit(-1, "Cannot allocate memory for receive data(init).\n");
+		}
+	}
 
 	ret = spp_connect_to_controller(&sock);
 	if (unlikely(ret != 0))

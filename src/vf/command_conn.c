@@ -4,6 +4,7 @@
 #include <errno.h>
 #include <arpa/inet.h>
 
+#include <rte_common.h>
 #include <rte_log.h>
 #include <rte_branch_prediction.h>
 
@@ -45,7 +46,7 @@ spp_connect_to_controller(int *sock)
 	/* create socket */
 	RTE_LOG(INFO, SPP_COMMAND_PROC, "Creating socket...\n");
 	*sock = socket(AF_INET, SOCK_STREAM, 0);
-	if (*sock < 0) {
+	if (unlikely(*sock < 0)) {
 		RTE_LOG(ERR, SPP_COMMAND_PROC, 
 				"Cannot create tcp socket. errno=%d\n", errno);
 		return -1;
@@ -60,7 +61,7 @@ spp_connect_to_controller(int *sock)
 	RTE_LOG(INFO, SPP_COMMAND_PROC, "Trying to connect ... socket=%d\n", *sock);
 	ret = connect(*sock, (struct sockaddr *)&controller_addr,
 			sizeof(controller_addr));
-	if (ret < 0) {
+	if (unlikely(ret < 0)) {
 		RTE_LOG(ERR, SPP_COMMAND_PROC,
 				"Cannot connect to controller. errno=%d\n", errno);
 		close(*sock);
@@ -89,11 +90,11 @@ spp_receive_message(int *sock, char **strbuf)
 	size_t rx_buf_sz = MESSAGE_BUFFER_BLOCK_SIZE;
 
 	ret = recv(*sock, rx_buf, rx_buf_sz, 0);
-	if (ret <= 0) {
-		if (ret == 0) {
+	if (unlikely(ret <= 0)) {
+		if (likely(ret == 0)) {
 			RTE_LOG(INFO, SPP_COMMAND_PROC,
 					"Controller has performed an shutdown.");
-		} else if (errno == EAGAIN || errno == EWOULDBLOCK) {
+		} else if (likely(errno == EAGAIN || errno == EWOULDBLOCK)) {
 			/* no receive message */
 			return 0;
 		} else {
@@ -101,7 +102,7 @@ spp_receive_message(int *sock, char **strbuf)
 					"Receive failure. errno=%d\n", errno);
 		}
 
-		RTE_LOG(INFO, SPP_COMMAND_PROC, "Assume Server closed connection\n");
+		RTE_LOG(INFO, SPP_COMMAND_PROC, "Assume Server closed connection.\n");
 		close(*sock);
 		*sock = -1;
 		return -1;
@@ -112,7 +113,9 @@ spp_receive_message(int *sock, char **strbuf)
 
 	new_strbuf = spp_strbuf_append(*strbuf, rx_buf, n_rx);
 	if (unlikely(new_strbuf == NULL)) {
-		return -1;
+		RTE_LOG(ERR, SPP_COMMAND_PROC,
+				"Cannot allocate memory for receive data.\n");
+		rte_exit(-1, "Cannot allocate memory for receive data.\n");
 	}
 
 	*strbuf = new_strbuf;
