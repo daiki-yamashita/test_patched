@@ -390,7 +390,7 @@ spp_command_proc_init(const char *controller_ip, int controller_port)
 }
 
 /* process command from controller. */
-void
+int
 spp_command_proc_do(void)
 {
 	int ret = -1;
@@ -409,17 +409,19 @@ spp_command_proc_do(void)
 		if (unlikely(msgbuf == NULL)) {
 			RTE_LOG(ERR, SPP_COMMAND_PROC,
 					"Cannot allocate memory for receive data(init).\n");
-			rte_exit(-1, "Cannot allocate memory for receive data(init).\n");
+			return -1;
 		}
 	}
 
 	ret = spp_connect_to_controller(&sock);
 	if (unlikely(ret != 0))
-		return;
+		return 0;
 
 	msg_ret = spp_receive_message(&sock, &msgbuf);
-	if (likely(msg_ret <= 0)) {
-		return;
+	if (unlikely(msg_ret == 0 || msg_ret == SPP_CONNERR_TEMPORARY)) {
+		return 0;
+	} else if (unlikely(msg_ret < 0)) {
+		return -1;
 	}
 
 	for (i = 0; i < msg_ret; ++i) {
@@ -445,4 +447,6 @@ spp_command_proc_do(void)
 	}
 
 	msg_len = msg_len + msg_ret;
+
+	return 0;
 }

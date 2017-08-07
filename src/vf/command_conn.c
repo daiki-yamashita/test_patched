@@ -49,7 +49,7 @@ spp_connect_to_controller(int *sock)
 	if (unlikely(*sock < 0)) {
 		RTE_LOG(ERR, SPP_COMMAND_PROC, 
 				"Cannot create tcp socket. errno=%d\n", errno);
-		return -1;
+		return SPP_CONNERR_TEMPORARY;
 	}
 
 	memset(&controller_addr, 0, sizeof(controller_addr));
@@ -66,7 +66,7 @@ spp_connect_to_controller(int *sock)
 				"Cannot connect to controller. errno=%d\n", errno);
 		close(*sock);
 		*sock = -1;
-		return -1;
+		return SPP_CONNERR_TEMPORARY;
 	}
 
 	RTE_LOG(INFO, SPP_COMMAND_PROC, "Connected\n");
@@ -105,7 +105,7 @@ spp_receive_message(int *sock, char **strbuf)
 		RTE_LOG(INFO, SPP_COMMAND_PROC, "Assume Server closed connection.\n");
 		close(*sock);
 		*sock = -1;
-		return -1;
+		return SPP_CONNERR_TEMPORARY;
 	}
 
 	RTE_LOG(DEBUG, SPP_COMMAND_PROC, "Receive message. count=%d\n", ret);
@@ -115,7 +115,7 @@ spp_receive_message(int *sock, char **strbuf)
 	if (unlikely(new_strbuf == NULL)) {
 		RTE_LOG(ERR, SPP_COMMAND_PROC,
 				"Cannot allocate memory for receive data.\n");
-		rte_exit(-1, "Cannot allocate memory for receive data.\n");
+		return SPP_CONNERR_FATAL;
 	}
 
 	*strbuf = new_strbuf;
@@ -134,7 +134,7 @@ spp_send_message(int *sock, const char* message, size_t message_len)
 		RTE_LOG(ERR, SPP_COMMAND_PROC, "Send failure. ret=%d\n", ret);
 		close(*sock);
 		*sock = -1;
-		return -1;
+		return SPP_CONNERR_TEMPORARY;
 	}
 
 	return 0;

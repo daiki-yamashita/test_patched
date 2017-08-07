@@ -10,16 +10,19 @@
  * @param controller_port
  *  controller listen port number.
  *
- * @ret_val 0 succeeded.
- * @ret_val -1 failed.
+ * @retval 0  succeeded.
+ * @retval -1 failed.
  */
 int
 spp_command_proc_init(const char *controller_ip, int controller_port);
 
 /**
  * process command from controller.
+ *
+ * @retval 0  succeeded.
+ * @retval -1 failed.
  */
-void
+int
 spp_command_proc_do(void);
 
 #endif /* _COMMAND_PROC_H_ */

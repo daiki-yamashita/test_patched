@@ -970,13 +970,17 @@ ut_main(int argc, char *argv[])
 		RTE_LOG(INFO, APP, "[Press Ctrl-C to quit ...]\n");
 
 		/* loop */
+		int ret_do = 0;
 #ifndef USE_UT_SPP_VF
 		while(likely(g_core_info[main_lcore_id].status != SPP_CORE_STOP_REQUEST)) {
 #else
 		{
 #endif
 			/* コマンド受付 */
-			spp_command_proc_do();
+			ret_do = spp_command_proc_do();
+			if (unlikely(ret_do != 0)) {
+				break;
+			}
 
 			/* CPUを占有しない様に1秒スリープ */
 			sleep(1);
@@ -984,6 +988,11 @@ ut_main(int argc, char *argv[])
 #ifdef SPP_RINGLATENCYSTATS_ENABLE /* RING滞留時間 */
 			print_ring_latency_stats();
 #endif /* SPP_RINGLATENCYSTATS_ENABLE */
+		}
+
+		/* エラー終了 */
+		if (unlikely(ret_do != 0)) {
+			break;
 		}
 
 		/* 正常終了 */
