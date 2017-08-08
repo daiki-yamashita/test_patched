@@ -418,10 +418,13 @@ spp_command_proc_do(void)
 		return 0;
 
 	msg_ret = spp_receive_message(&sock, &msgbuf);
-	if (unlikely(msg_ret == 0 || msg_ret == SPP_CONNERR_TEMPORARY)) {
-		return 0;
-	} else if (unlikely(msg_ret < 0)) {
-		return -1;
+	if (unlikely(msg_ret <= 0)) {
+		if (likely(msg_ret == 0))
+			return 0;
+		else if (unlikely(msg_ret == SPP_CONNERR_TEMPORARY))
+			return 0;
+		else
+			return -1;
 	}
 
 	for (i = 0; i < msg_ret; ++i) {

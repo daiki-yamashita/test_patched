@@ -15,8 +15,8 @@
  * @param controller_port
  *  controller listen port number.
  *
- * @retval 0                     succeeded.
- * @retval SPP_CONNERR_TEMPORARY temporary error. please retry.
+ * @retval 0  succeeded.
+ * @retval -1 failed.
  */
 int spp_command_conn_init(const char *controller_ip, int controller_port);
 
@@ -28,8 +28,8 @@ int spp_command_conn_init(const char *controller_ip, int controller_port);
  * @param sock
  *  socket that connect to controller.
  *
- * @retval 0 succeeded.
- * @retval -1 failed.
+ * @retval 0                     succeeded.
+ * @retval SPP_CONNERR_TEMPORARY temporary error. please retry.
  */
 int spp_connect_to_controller(int *sock);
 
