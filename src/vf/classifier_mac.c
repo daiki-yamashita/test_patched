@@ -64,6 +64,9 @@ static const size_t ETHER_ADDR_STR_BUF_SZ =
 /* classifier information */
 struct classifier_mac_info {
 	struct rte_hash *classifier_table;
+	int num_active_classified;
+	int active_classifieds[RTE_MAX_ETHPORTS];
+	int default_classified;
 };
 
 /* classifier management information */
@@ -91,27 +94,46 @@ static struct classifier_mac_mng_info g_classifier_mng_info[RTE_MAX_LCORE];
 		but since we want to start at 0. */
 static rte_atomic16_t g_hash_table_count = RTE_ATOMIC16_INIT(0xff);
 
-/* initialize classifier table. */
+/* initialize classifier information. */
 static int
-init_classifier_table(struct rte_hash **classifier_table,
+init_classifier_info(struct classifier_mac_info *classifier_info,
 		const struct spp_core_info *core_info)
 {
 	int ret = -1;
 	int i;
+	struct rte_hash **classifier_table = &classifier_info->classifier_table;
 	struct ether_addr eth_addr;
 	char mac_addr_str[ETHER_ADDR_STR_BUF_SZ];
 
 	rte_hash_reset(*classifier_table);
+	classifier_info->num_active_classified = 0;
+	classifier_info->default_classified = -1;
 
 	for (i = 0; i < core_info->num_tx_port; i++) {
 		if (core_info->tx_ports[i].mac_addr == 0) {
 			continue;
 		}
 
+		/* store active tx_port that associate with mac address */
+		classifier_info->active_classifieds[classifier_info->
+				num_active_classified++] = i;
+
+		/* store default classified */
+		if (unlikely(core_info->tx_ports[i].mac_addr ==
+				SPP_CONFIG_DEFAULT_CLASSIFIED_DMY_ADDR)) {
+			classifier_info->default_classified = i;
+			RTE_LOG(INFO, SPP_CLASSIFIER_MAC, "default classified. "
+					"if_type=%d, if_no=%d, dpdk_port=%d\n",
+					core_info->tx_ports[i].if_type,
+					core_info->tx_ports[i].if_no,
+					core_info->tx_ports[i].dpdk_port);
+			continue;
+		}
+
+		/* add entry to classifier mac table */
 		rte_memcpy(&eth_addr, &core_info->tx_ports[i].mac_addr, ETHER_ADDR_LEN);
 		ether_format_addr(mac_addr_str, sizeof(mac_addr_str), &eth_addr);
 
-		/* add entry to classifier mac table */
 		ret = rte_hash_add_key_data(*classifier_table,
 				(void*)&eth_addr, (void*)(long)i);
 		if (unlikely(ret < 0)) {
@@ -186,11 +208,9 @@ init_classifier(const struct spp_core_info *core_info,
 		}
 	}
 
-	/* populate the hash at reference table */
-	classifier_mac_table = &classifier_mng_info->info[classifier_mng_info->ref_index].
-			classifier_table;
-
-	ret = init_classifier_table(classifier_mac_table, core_info);
+	/* populate the classifier information at reference */
+	ret = init_classifier_info(&classifier_mng_info->
+			info[classifier_mng_info->ref_index], core_info);
 	if (unlikely(ret != 0)) {
 		RTE_LOG(ERR, SPP_CLASSIFIER_MAC,
 				"Cannot initialize classifer mac table. ret=%d\n", ret);
@@ -252,6 +272,42 @@ transmit_packet(struct classified_data *classified_data)
 	classified_data->num_pkt = 0;
 }
 
+/* set mbuf pointer to tx buffer
+	and transmit packet, if buffer is filled */
+static inline void
+push_packet(struct rte_mbuf *pkt, struct classified_data *classified_data)
+{
+	classified_data->pkts[classified_data->num_pkt++] = pkt;
+
+	/* transmit packet, if buffer is filled */
+	if (unlikely(classified_data->num_pkt == MAX_PKT_BURST)) {
+		RTE_LOG(DEBUG, SPP_CLASSIFIER_MAC,
+				"transimit packets (buffer is filled). "
+				"if_type=%d, if_no=%d, tx_port=%hhd, num_pkt=%hu\n",
+				classified_data->if_type,
+				classified_data->if_no,
+				classified_data->tx_port,
+				classified_data->num_pkt);
+		transmit_packet(classified_data);
+	}
+}
+
+/* handle L2 multicast(include broadcast) packet */
+static inline void
+handle_l2multicast_packet(struct rte_mbuf *pkt,
+		struct classifier_mac_info *classifier_info,
+		struct classified_data *classified_data)
+{
+	int i;
+
+	rte_mbuf_refcnt_update(pkt, classifier_info->num_active_classified);
+
+	for (i= 0; i < classifier_info->num_active_classified; i++) {
+		push_packet(pkt, classified_data + 
+				(long)classifier_info->active_classifieds[i]);
+	}
+}
+
 /* classify packet by destination mac address,
 		and transmit packet (conditional). */
 static inline void
@@ -262,7 +318,6 @@ classify_packet(struct rte_mbuf **rx_pkts, uint16_t n_rx,
 	int ret;
 	int i;
 	struct ether_hdr *eth;
-	struct classified_data *cd;
 	void *lookup_data;
 	char mac_addr_str[ETHER_ADDR_STR_BUF_SZ];
 
@@ -272,27 +327,41 @@ classify_packet(struct rte_mbuf **rx_pkts, uint16_t n_rx,
 		/* find in table (by destination mac address)*/
 		ret = rte_hash_lookup_data(classifier_info->classifier_table,
 				(const void*)&eth->d_addr, &lookup_data);
-		if (unlikely(ret < 0)) {
-			ether_format_addr(mac_addr_str, sizeof(mac_addr_str), &eth->d_addr);
-			RTE_LOG(ERR, SPP_CLASSIFIER_MAC,
-					"unknown mac address. ret=%d, mac_addr=%s\n", ret, mac_addr_str);
-			rte_pktmbuf_free(rx_pkts[i]);
-			continue;
-		}
+		if (ret < 0) {
+			/* L2 multicast(include broadcast) ? */
+			if (unlikely(is_multicast_ether_addr(&eth->d_addr))) {
+				RTE_LOG(DEBUG, SPP_CLASSIFIER_MAC,
+						"multicast mac address.\n");
+				handle_l2multicast_packet(rx_pkts[i],
+						classifier_info, classified_data);
+				continue;
+			}
 
-		/* set mbuf pointer to tx buffer */
-		cd = classified_data + (long)lookup_data;
-		cd->pkts[cd->num_pkt++] = rx_pkts[i];
+			/* if no default, drop packet */
+			if (unlikely(classifier_info->default_classified == -1)) {
+				ether_format_addr(mac_addr_str,
+						sizeof(mac_addr_str), &eth->d_addr);
+				RTE_LOG(ERR, SPP_CLASSIFIER_MAC,
+						"unknown mac address. "
+						"ret=%d, mac_addr=%s\n",
+						ret, mac_addr_str);
+				rte_pktmbuf_free(rx_pkts[i]);
+				continue;
+			}
 
-		/* transmit packet, if buffer is filled */
-		if (unlikely(cd->num_pkt == MAX_PKT_BURST)) {
+			/* to default classifed */
 			RTE_LOG(DEBUG, SPP_CLASSIFIER_MAC,
-                        		"transimit packets (buffer is filled). index=%ld, num_pkt=%hu\n", (long)lookup_data, cd->num_pkt);
-			transmit_packet(cd);
+					"to default classified.\n");
+			lookup_data = (void *)(long)classifier_info->default_classified;
 		}
+
+		/* set mbuf pointer to tx buffer
+			and transmit packet, if buffer is filled */
+		push_packet(rx_pkts[i], classified_data + (long)lookup_data);
 	}
 }
 
+/* change update index at classifier management information */
 static inline void
 change_update_index(struct classifier_mac_mng_info *classifier_mng_info, unsigned int lcore_id)
 {
@@ -322,8 +391,8 @@ spp_classifier_mac_update(struct spp_core_info *core_info)
 	RTE_LOG(INFO, SPP_CLASSIFIER_MAC,
 			"Core[%u] Start update component.\n", lcore_id);
 
-	/* initialize update side classifier table */
-	ret = init_classifier_table(&classifier_info->classifier_table, core_info);
+	/* initialize update side classifier information */
+	ret = init_classifier_info(classifier_info, core_info);
 	if (unlikely(ret != 0)) {
 		RTE_LOG(ERR, SPP_CLASSIFIER_MAC,
 				"Cannot update classifer mac. ret=%d\n", ret);

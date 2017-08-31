@@ -319,6 +319,12 @@ config_load_classifier_table(const json_t *obj,
 			return -1;
 		}
 
+		/* デフォルト転送先指定であれば内部流通用ダミーアドレスに変換 */
+		if (unlikely(strcmp(tmp_table->mac_addr_str,
+				SPP_CONFIG_DEFAULT_CLASSIFIED_SPEC_STR) == 0))
+			strcpy(tmp_table->mac_addr_str,
+					SPP_CONFIG_DEFAULT_CLASSIFIED_DMY_ADDR_STR);
+
 		/* MACアドレス数値変換 */
 		int64_t ret_mac64 = spp_config_change_mac_str_to_int64(
 				tmp_table->mac_addr_str);

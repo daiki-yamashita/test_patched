@@ -158,6 +158,10 @@ decode_mac_addr_str_value(void *output, const json_t *value_obj,
 	int ret = -1;
 	const char* str_val = json_string_value(value_obj);
 
+	/* if default specification, convert to internal dummy address */
+	if (unlikely(strcmp(str_val, SPP_CONFIG_DEFAULT_CLASSIFIED_SPEC_STR) == 0))
+		str_val = SPP_CONFIG_DEFAULT_CLASSIFIED_DMY_ADDR_STR;
+
 	ret = spp_config_change_mac_str_to_int64(str_val);
 	if (unlikely(ret == -1)) {
 		RTE_LOG(ERR, SPP_COMMAND_PROC, "Bad mac address string. val=%s\n",
