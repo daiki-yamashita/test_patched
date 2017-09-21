@@ -245,66 +245,6 @@ stop_process(int signal) {
 }
 
 /*
- * 起動パラメータのCPUのbitmapを数値へ変換
- */
-static int
-parse_cpu_bit(uint64_t *cpu, const char *cpu_bit)
-{
-	char *endptr = NULL;
-	uint64_t temp;
-
-	temp = strtoull(cpu_bit, &endptr, 0);
-	if (unlikely(endptr == cpu_bit) || unlikely(*endptr != '\0')) {
-		return -1;
-	}
-
-	*cpu = temp;
-	RTE_LOG(DEBUG, APP, "cpu = %lu", *cpu);
-	return 0;
-}
-
-/*
- * Parse the dpdk arguments for use in client app.
- */
-static int
-parse_dpdk_args(int argc, char *argv[])
-{
-	int cnt;
-	int option_index, opt;
-	const int argcopt = argc;
-	char *argvopt[argcopt];
-	const char *progname = argv[0];
-	static struct option lgopts[] = { {0} };
-
-	/* getoptを使用するとargvが並び変わるみたいなので、コピーを実施 */
-	for (cnt = 0; cnt < argcopt; cnt++) {
-		argvopt[cnt] = argv[cnt];
-	}
-
-	/* Check DPDK parameter */
-	optind = 0;
-	opterr = 0;
-	while ((opt = getopt_long(argc, argvopt, "c:", lgopts,
-			&option_index)) != EOF) {
-		switch (opt) {
-		case 'c':
-			/* CPU */
-			if (parse_cpu_bit(&g_startup_param.cpu, optarg) != 0) {
-				usage(progname);
-				return -1;
-			}
-			break;
-		default:
-			/* CPU */
-			/* DPDKのパラメータは他にもあるので、エラーとはしない */
-			break;
-		}
-	}
-
-	return 0;
-}
-
-/*
  * Parses the process ID of the application argument.
  */
 static int
@@ -493,7 +433,6 @@ set_form_proc_info(struct spp_config_area *config)
 	int core_cnt, rx_start, rx_cnt, tx_start, tx_cnt;
 	enum port_type if_type;
 	int if_no;
-	uint64_t cpu_bit = 0;
 	struct spp_config_functions *core_func = NULL;
 	struct spp_core_info *core_info = NULL;
 	struct patch_info *patch_info = NULL;
@@ -517,7 +456,12 @@ set_form_proc_info(struct spp_config_area *config)
 
 		/* Set CORE type */
 		core_info->type = core_func->type;
-		cpu_bit |= 1 << core_func->core_no;
+		if (!rte_lcore_is_enabled(core_func->core_no)) {
+			/* CPU mismatch */
+			RTE_LOG(ERR, APP, "CPU mismatch (cpu = %u)\n",
+					core_func->core_no);
+			return -1;
+		}
 
 		/* Set RX port */
 		rx_start = core_info->num_rx_port;
@@ -570,14 +514,6 @@ set_form_proc_info(struct spp_config_area *config)
 		}
 	}
 
-#if 0 /* bugfix#385 */
-	if (unlikely((cpu_bit & g_startup_param.cpu) != cpu_bit)) {
-		/* CPU mismatch */
-		RTE_LOG(ERR, APP, "CPU mismatch (cpu param = %lx, config = %lx)\n",
-				g_startup_param.cpu, cpu_bit);
-		return -1;
-	}
-#endif
 	return 0;
 }
 
@@ -883,12 +819,6 @@ ut_main(int argc, char *argv[])
 
 	unsigned int main_lcore_id = 0xffffffff;
 	while(1) {
-		/* Parse dpdk parameters */
-		int ret_parse = parse_dpdk_args(argc, argv);
-		if (unlikely(ret_parse != 0)) {
-			break;
-		}
-
 		/* DPDK initialize */
 		int ret_dpdk = rte_eal_init(argc, argv);
 		if (unlikely(ret_dpdk < 0)) {
@@ -903,7 +833,7 @@ ut_main(int argc, char *argv[])
 		rte_log_set_global_level(RTE_LOG_LEVEL);
 
 		/* Parse application parameters */
-		ret_parse = parse_app_args(argc, argv);
+		int ret_parse = parse_app_args(argc, argv);
 		if (unlikely(ret_parse != 0)) {
 			break;
 		}
