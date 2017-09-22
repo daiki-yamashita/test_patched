@@ -23,15 +23,16 @@ enum SPP_LONGOPT_RETVAL {
 	/* add below */
 
 	SPP_LONGOPT_RETVAL_CONFIG,
-	SPP_LONGOPT_RETVAL_PROCESS_ID
+	SPP_LONGOPT_RETVAL_PROCESS_ID,
+	SPP_LONGOPT_RETVAL_VHOST_CLIENT
 };
 
 /* struct */
 struct startup_param {
-	uint64_t cpu;
 	int process_id;
 	char server_ip[INET_ADDRSTRLEN];
 	int server_port;
+	int vhost_client;
 };
 
 struct patch_info {
@@ -68,10 +69,15 @@ static char config_file_path[PATH_MAX];
 static void
 usage(const char *progname)
 {
-	RTE_LOG(INFO, APP, "Usage: %s [EAL args] -- --process-id PROC_ID [--config CONFIG_FILE_PATH] -s SERVER_IP:SERVER_PORT\n"
+	RTE_LOG(INFO, APP, "Usage: %s [EAL args] --"
+			" --process-id PROC_ID"
+			" [--config CONFIG_FILE_PATH]"
+			" -s SERVER_IP:SERVER_PORT"
+			" [--vhost-client]\n"
 			" --process-id PROCESS_ID   : My process ID\n"
 			" --config CONFIG_FILE_PATH : specific config file path\n"
 			" -s SERVER_IP:SERVER_PORT  : Access information to the server\n"
+			" --vhost-client            : Run vhost on client\n"
 			, progname);
 }
 
@@ -103,7 +109,7 @@ add_ring_pmd(int ring_id)
  * Set VHOST PMD
  */
 static int
-add_vhost_pmd(int index)
+add_vhost_pmd(int index, int client)
 {
 	struct rte_eth_conf port_conf = {
 		.rxmode = { .max_rx_pkt_len = ETHER_MAX_LEN }
@@ -129,7 +135,8 @@ add_vhost_pmd(int index)
 	name = get_vhost_backend_name(index);
 	iface = get_vhost_iface_name(index);
 
-	sprintf(devargs, "%s,iface=%s,queues=%d", name, iface, nr_queues);
+	sprintf(devargs, "%s,iface=%s,queues=%d,client=%d",
+			name, iface, nr_queues, client);
 	ret = rte_eth_dev_attach(devargs, &vhost_port_id);
 	if (unlikely(ret < 0)) {
 		RTE_LOG(ERR, APP, "rte_eth_dev_attach error. (ret = %d)\n", ret);
@@ -308,6 +315,7 @@ parse_app_args(int argc, char *argv[])
 	static struct option lgopts[] = { 
 			{ "config", required_argument, NULL, SPP_LONGOPT_RETVAL_CONFIG },
 			{ "process-id", required_argument, NULL, SPP_LONGOPT_RETVAL_PROCESS_ID },
+			{ "vhost-client", no_argument, NULL, SPP_LONGOPT_RETVAL_VHOST_CLIENT },
 			{ 0 },
 	};
 
@@ -315,6 +323,9 @@ parse_app_args(int argc, char *argv[])
 	for (cnt = 0; cnt < argcopt; cnt++) {
 		argvopt[cnt] = argv[cnt];
 	}
+
+	/* Clear startup parameters */
+	memset(&g_startup_param, 0x00, sizeof(g_startup_param));
 
 	/* Check application parameter */
 	optind = 0;
@@ -336,6 +347,9 @@ parse_app_args(int argc, char *argv[])
 			}
 			proc_flg = 1;
 			break;
+		case SPP_LONGOPT_RETVAL_VHOST_CLIENT:
+			g_startup_param.vhost_client = 1;
+			break;
 		case 's':
 			if (parse_app_server(optarg, g_startup_param.server_ip,
 					&g_startup_param.server_port) != 0) {
@@ -356,11 +370,12 @@ parse_app_args(int argc, char *argv[])
 		usage(progname);
 		return -1;
 	}
-	RTE_LOG(INFO, APP, "application arguments value. (process id = %d, config = %s, server = %s:%d)\n",
+	RTE_LOG(INFO, APP, "application arguments value. (process id = %d, config = %s, server = %s:%d, vhost client = %d)\n",
 			g_startup_param.process_id,
 			config_file_path,
 			g_startup_param.server_ip,
-			g_startup_param.server_port);
+			g_startup_param.server_port,
+			g_startup_param.vhost_client);
 	return 0;
 }
 
@@ -619,7 +634,7 @@ set_vhost_interface(struct spp_config_area *config)
 		}
 
 		/* Set DPDK port */
-		int dpdk_port = add_vhost_pmd(vhost_cnt);
+		int dpdk_port = add_vhost_pmd(vhost_cnt, g_startup_param.vhost_client);
 		if (unlikely(dpdk_port < 0)) {
 			RTE_LOG(ERR, APP, "VHOST add failed. (no = %d)\n",
 					vhost_cnt);
@@ -779,6 +794,11 @@ static void
 del_vhost_sockfile(struct patch_info *vhost_patchs)
 {
 	int cnt;
+
+	/* Do not delete for vhost client. */
+	if (g_startup_param.vhost_client != 0)
+		return;
+
 	for (cnt = 0; cnt < RTE_MAX_ETHPORTS; cnt++) {
 		if (likely(vhost_patchs[cnt].use_flg == 0)) {
 			/* VHOST未使用はスキップ */
