@@ -168,6 +168,9 @@ Edit VM configuration with virsh.
 
 ```sh
 $ virsh edit [VM_NAME]
+```
+
+```xml
 <domain type='kvm' xmlns:qemu='http://libvirt.org/schemas/domain/qemu/1.0'>
 	  <name>spp-vm1</name>
 	  <uuid>d90f5420-861a-4479-8559-62d7a1545cb9</uuid>
