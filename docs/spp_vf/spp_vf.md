@@ -41,6 +41,78 @@ The following sections provide some explanation of the code.
 
 ### Configuration
 
+The config file is imported after rte_eal_init() and initialization
+of the application.
+spp_config_load_file() is defined in spp_config.c and default file
+path SPP_CONFIG_FILE_PATH is defined in its header file..
+
+  ```c:spp_vf.c
+	/* set default config file path */
+	strcpy(config_file_path, SPP_CONFIG_FILE_PATH);
+
+	unsigned int main_lcore_id = 0xffffffff;
+	while(1) {
+		/* Parse dpdk parameters */
+		int ret_parse = parse_dpdk_args(argc, argv);
+		if (unlikely(ret_parse != 0)) {
+			break;
+		}
+
+		/* DPDK initialize */
+		int ret_dpdk = rte_eal_init(argc, argv);
+		if (unlikely(ret_dpdk < 0)) {
+			break;
+		}
+
+		/* Skip dpdk parameters */
+		argc -= ret_dpdk;
+		argv += ret_dpdk;
+
+		/* Set log level  */
+		rte_log_set_global_level(RTE_LOG_LEVEL);
+
+		/* Parse application parameters */
+		ret_parse = parse_app_args(argc, argv);
+		if (unlikely(ret_parse != 0)) {
+			break;
+		}
+
+		RTE_LOG(INFO, APP, "Load config file(%s)\n", config_file_path);
+
+		/* Load config */
+		int ret_config = spp_config_load_file(config_file_path, 0, &g_config);
+		if (unlikely(ret_config != 0)) {
+			break;
+		}
+
+		/* Get core id. */
+		main_lcore_id = rte_lcore_id();
+  ```
+
+spp_config_load_file() uses [jansson]() for parsing JSON.
+json_load_file() is a function  of jansson to parse raw JSON
+file and return json_t object as a result.
+In spp_config_load_file(), configuration of classifier table and
+resource assignment of threads are loaded into config of spp.
+
+After importing config, each of threads are launched.
+
+  ```c:spp_vf.c
+		/* Start  thread */
+		unsigned int lcore_id = 0;
+		RTE_LCORE_FOREACH_SLAVE(lcore_id) {
+			if (g_core_info[lcore_id].type == SPP_CONFIG_CLASSIFIER_MAC) {
+				rte_eal_remote_launch(spp_classifier_mac_do,
+						(void *)&g_core_info[lcore_id],
+						lcore_id);
+			} else {
+				rte_eal_remote_launch(spp_forward,
+						(void *)&g_core_info[lcore_id],
+						lcore_id);
+			}
+		}
+  ```
+
 ### Forwarding
 
 ### Packet Cloning
