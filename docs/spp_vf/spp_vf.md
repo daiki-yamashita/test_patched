@@ -2,16 +2,14 @@
 
 SPP_VF is a SR-IOV like network functionality using DPDK for NFV.
 
-![spp_vf_overview](spp_vf_overview.svg)
-
 ## Overview
 
 The application distributes incoming packets depends on MAC address
 similar to SR-IOV functionality.
 Network configuration is defined in JSON config file which is imported
 while launching the application.
-The configuration is able to change by sending commnad from spp after
-initialization.
+The configuration is able to change after initialization by sending
+commnad from spp controller.
 
 SPP_VF is a multi-thread application.
 It consists of manager thread and forwarder threads.
@@ -31,11 +29,11 @@ by looking MAC address in the packet..
 
 ## Build the Application
 
-See [setup_guide](setup_guide.md).
+See [setup guide](setup.md).
 
 ## Running the Application
 
-See [how_to_use](how_to_use.md).
+See [how to use](how_to_use.md).
 
 ## Explanation
 
