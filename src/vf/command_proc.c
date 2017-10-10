@@ -50,13 +50,8 @@ execute_command(const struct spp_command *command)
 		ret = spp_flush();
 		break;
 
-	case SPP_CMDTYPE_PROCESS:
-		RTE_LOG(INFO, SPP_COMMAND_PROC, "Execute process command.\n");
-		/* nothing to do here */
-		break;
-
 	default:
-		RTE_LOG(ERR, SPP_COMMAND_PROC, "Unknown command. type=%d\n", command->type);
+		RTE_LOG(INFO, SPP_COMMAND_PROC, "Execute other command. type=%d\n", command->type);
 		/* nothing to do here */
 		break;
 	}
@@ -229,6 +224,73 @@ append_response_process_value(json_t *parent_obj)
 	return 0;
 }
 
+/* append classifier element value */
+static
+int append_classifier_element_value(
+		void *opaque,
+		__rte_unused enum spp_classifier_type type,
+		const char *data,
+		const struct spp_config_port_info *port)
+{
+	json_t *parent_obj = (json_t *)opaque;
+
+	char port_str[64];
+	spp_config_format_if_info(port_str, port->if_type, port->if_no);
+
+	json_array_append_new(parent_obj, json_pack(
+			"{ssssss}",
+			"type", "mac",
+			"value", data,
+			"port", port_str));
+
+	return 0;
+}
+
+/* append info value(status response) to specified json object */
+static int 
+append_response_info_value(json_t *parent_obj)
+{
+	int ret = -1;
+	json_t *info_obj, *tab_obj;
+	struct spp_iterate_classifier_table_params itr_params;
+
+	/* create classifier_table array */
+	tab_obj = json_array();
+	if (unlikely(tab_obj == NULL))
+		return -1;
+
+	itr_params.opaque = tab_obj;
+	itr_params.element_proc = append_classifier_element_value;
+
+	ret = spp_iterate_classifier_table(&itr_params);
+	if (unlikely(ret != 0)) {
+		json_decref(tab_obj);
+		return -1;
+	}
+
+	/* set classifier_table object in info object */
+	info_obj = json_object();
+	if (unlikely(info_obj == NULL)) {
+		json_decref(tab_obj);
+		return -1;
+	}
+
+	ret = json_object_set_new(info_obj, "classifier_table", tab_obj);
+	if (unlikely(ret != 0)) {
+		json_decref(tab_obj);
+		return -1;
+	}
+
+	/* set info object in parent object */
+	ret = json_object_set_new(parent_obj, "info", info_obj);
+	if (unlikely(ret != 0)) {
+		json_decref(info_obj);
+		return -1;
+	}
+
+	return 0;
+}
+
 /* send response for decode error */
 static void
 send_decode_error_response(int *sock, const struct spp_command_request *request,
@@ -244,10 +306,6 @@ send_decode_error_response(int *sock, const struct spp_command_request *request,
 		return;
 	}
 
-	/* **
-	 * output order of object in string is inverse to addition order
-	 * **/
-
 	/* create & append result array */
 	ret = append_response_decode_results_object(top_obj, request, decode_error);
 	if (unlikely(ret != 0)) {
@@ -257,10 +315,10 @@ send_decode_error_response(int *sock, const struct spp_command_request *request,
 	}
 
 	/* serialize */
-	msg = json_dumps(top_obj, JSON_INDENT(2));
+	msg = json_dumps(top_obj, JSON_INDENT(2) | JSON_PRESERVE_ORDER);
 	json_decref(top_obj);
 
-	RTE_LOG(INFO, SPP_COMMAND_PROC, "Make command response (decode error). "
+	RTE_LOG(DEBUG, SPP_COMMAND_PROC, "Make command response (decode error). "
 			"response_str=\n%s\n", msg);
 
 	/* send response to requester */
@@ -288,9 +346,13 @@ send_command_result_response(int *sock, const struct spp_command_request *reques
 		return;
 	}
 
-	/* **
-	 * output order of object in string is inverse to addition order
-	 * **/
+	/* create & append result array */
+	ret = append_response_command_results_object(top_obj, request, command_results);
+	if (unlikely(ret != 0)) {
+		RTE_LOG(ERR, SPP_COMMAND_PROC, "Failed to make command result response.");
+		json_decref(top_obj);
+		return;
+	}
 
 	/* append process information value */
 	if (request->is_requested_process) {
@@ -302,19 +364,21 @@ send_command_result_response(int *sock, const struct spp_command_request *reques
 		}
 	}
 
-	/* create & append result array */
-	ret = append_response_command_results_object(top_obj, request, command_results);
-	if (unlikely(ret != 0)) {
-		RTE_LOG(ERR, SPP_COMMAND_PROC, "Failed to make command result response.");
-		json_decref(top_obj);
-		return;
+	/* append info value */
+	if (request->is_requested_status) {
+		ret = append_response_info_value(top_obj);
+		if (unlikely(ret != 0)) {
+			RTE_LOG(ERR, SPP_COMMAND_PROC, "Failed to make command result response.");
+			json_decref(top_obj);
+			return;
+		}
 	}
 
 	/* serialize */
-	msg = json_dumps(top_obj, JSON_INDENT(2));
+	msg = json_dumps(top_obj, JSON_INDENT(2) | JSON_PRESERVE_ORDER);
 	json_decref(top_obj);
 
-	RTE_LOG(INFO, SPP_COMMAND_PROC, "Make command response (command result). "
+	RTE_LOG(DEBUG, SPP_COMMAND_PROC, "Make command response (command result). "
 			"response_str=\n%s\n", msg);
 
 	/* send response to requester */
@@ -342,7 +406,7 @@ process_request(int *sock, const char *request_str, size_t request_str_len)
 	memset(&decode_error, 0, sizeof(struct spp_command_decode_error));
 	memset(command_results, 0, sizeof(command_results));
 
-	RTE_LOG(INFO, SPP_COMMAND_PROC, "Start command request processing. "
+	RTE_LOG(DEBUG, SPP_COMMAND_PROC, "Start command request processing. "
 			"request_str=\n%.*s\n", (int)request_str_len, request_str);
 
 	/* decode request message */
@@ -351,11 +415,11 @@ process_request(int *sock, const char *request_str, size_t request_str_len)
 	if (unlikely(ret != 0)) {
 		/* send error response */
 		send_decode_error_response(sock, &request, &decode_error);
-		RTE_LOG(INFO, SPP_COMMAND_PROC, "End command request processing.\n");
+		RTE_LOG(DEBUG, SPP_COMMAND_PROC, "End command request processing.\n");
 		return ret;
 	}
 
-	RTE_LOG(INFO, SPP_COMMAND_PROC, "Command request is valid. "
+	RTE_LOG(DEBUG, SPP_COMMAND_PROC, "Command request is valid. "
 			"num_command=%d, num_valid_command=%d\n",
 			request.num_command, request.num_valid_command);
 
@@ -377,7 +441,7 @@ process_request(int *sock, const char *request_str, size_t request_str_len)
 	/* send response */
 	send_command_result_response(sock, &request, command_results);
 
-	RTE_LOG(INFO, SPP_COMMAND_PROC, "End command request processing.\n");
+	RTE_LOG(DEBUG, SPP_COMMAND_PROC, "End command request processing.\n");
 
 	return 0;
 }

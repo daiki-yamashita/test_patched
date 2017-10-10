@@ -26,6 +26,7 @@ static const char *COMMAND_TYPE_STRINGS[] = {
 	"stop",
 #endif
 	"process",
+	"status",
 
 	/* termination */ "",
 };
@@ -421,6 +422,9 @@ spp_command_decode_request(struct spp_command_request *request, const char *requ
 		switch (request->commands[i].type) {
 		case SPP_CMDTYPE_PROCESS:
 			request->is_requested_process = 1;
+			break;
+		case SPP_CMDTYPE_STATUS:
+			request->is_requested_status = 1;
 			break;
 		default:
 			/* nothing to do */

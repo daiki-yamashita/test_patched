@@ -61,6 +61,16 @@ static const size_t HASH_TABLE_NAME_BUF_SZ =
 static const size_t ETHER_ADDR_STR_BUF_SZ =
 		ETHER_ADDR_LEN * 2 + (ETHER_ADDR_LEN - 1) + 1;
 
+/* classified data (destination port, target packets, etc) */
+struct classified_data {
+	enum port_type  if_type;
+	int             if_no;
+	int             if_no_global;
+	uint8_t         tx_port;
+	uint16_t        num_pkt;
+	struct rte_mbuf *pkts[MAX_PKT_BURST];
+};
+
 /* classifier information */
 struct classifier_mac_info {
 	struct rte_hash *classifier_table;
@@ -74,15 +84,7 @@ struct classifier_mac_mng_info {
 	struct classifier_mac_info info[NUM_CLASSIFIER_MAC_INFO];
 	volatile int ref_index;
 	volatile int upd_index;
-};
-
-/* classified data (destination port, target packets, etc) */
-struct classified_data {
-	enum port_type  if_type;
-	int             if_no;
-	uint8_t         tx_port;
-	uint16_t        num_pkt;
-	struct rte_mbuf *pkts[MAX_PKT_BURST];
+	struct classified_data classified_data[RTE_MAX_ETHPORTS];
 };
 
 /* classifier information per lcore */
@@ -93,6 +95,12 @@ static struct classifier_mac_mng_info g_classifier_mng_info[RTE_MAX_LCORE];
 		it is incremented at the time of use, 
 		but since we want to start at 0. */
 static rte_atomic16_t g_hash_table_count = RTE_ATOMIC16_INIT(0xff);
+
+static inline int
+is_used_mng_info(const struct classifier_mac_mng_info *mng_info)
+{
+	return (mng_info != NULL && mng_info->info[0].classifier_table != NULL);
+}
 
 /* initialize classifier information. */
 static int
@@ -219,10 +227,11 @@ init_classifier(const struct spp_core_info *core_info,
 
 	/* store ports information */
 	for (i = 0; i < core_info->num_tx_port; i++) {
-		classified_data[i].if_type = core_info->tx_ports[i].if_type;
-		classified_data[i].if_no   = i;
-		classified_data[i].tx_port = core_info->tx_ports[i].dpdk_port;
-		classified_data[i].num_pkt = 0;
+		classified_data[i].if_type      = core_info->tx_ports[i].if_type;
+		classified_data[i].if_no        = i;
+		classified_data[i].if_no_global = core_info->tx_ports[i].if_no;
+		classified_data[i].tx_port      = core_info->tx_ports[i].dpdk_port;
+		classified_data[i].num_pkt      = 0;
 	}
 
 	return 0;
@@ -283,8 +292,9 @@ push_packet(struct rte_mbuf *pkt, struct classified_data *classified_data)
 	if (unlikely(classified_data->num_pkt == MAX_PKT_BURST)) {
 		RTE_LOG(DEBUG, SPP_CLASSIFIER_MAC,
 				"transimit packets (buffer is filled). "
-				"if_type=%d, if_no=%d, tx_port=%hhd, num_pkt=%hu\n",
+				"if_type=%d, if_no={%d,%d}, tx_port=%hhd, num_pkt=%hu\n",
 				classified_data->if_type,
+				classified_data->if_no_global,
 				classified_data->if_no,
 				classified_data->tx_port,
 				classified_data->num_pkt);
@@ -381,6 +391,15 @@ change_update_index(struct classifier_mac_mng_info *classifier_mng_info, unsigne
 	}
 }
 
+/* classifier(mac address) initialize globals. */
+int
+spp_classifier_mac_init(void)
+{
+	memset(g_classifier_mng_info, 0, sizeof(g_classifier_mng_info));
+
+	return 0;
+}
+
 /* classifier(mac address) update component info. */
 int
 spp_classifier_mac_update(struct spp_core_info *core_info)
@@ -434,7 +453,7 @@ spp_classifier_mac_do(void *arg)
 	struct rte_mbuf *rx_pkts[MAX_PKT_BURST];
 
 	const int n_classified_data = core_info->num_tx_port;
-	struct classified_data classified_data[n_classified_data];
+	struct classified_data *classified_data = classifier_mng_info->classified_data;
 
 	uint64_t cur_tsc, prev_tsc = 0;
 	const uint64_t drain_tsc = (rte_get_tsc_hz() + US_PER_S - 1) /
@@ -504,6 +523,57 @@ spp_classifier_mac_do(void *arg)
 	uninit_classifier(classifier_mng_info);
 
 	core_info->status = SPP_CORE_STOP;
+
+	return 0;
+}
+
+/* classifier(mac address) iterate classifier table. */
+int spp_classifier_mac_iterate_table(
+		struct spp_iterate_classifier_table_params *params)
+{
+	int ret, i;
+	const void *key;
+	void *data;
+	uint32_t next = 0;
+	struct classifier_mac_mng_info *classifier_mng_info;
+	struct classifier_mac_info *classifier_info;
+	struct classified_data *classified_data;
+	struct spp_config_port_info port;
+	char mac_addr_str[ETHER_ADDR_STR_BUF_SZ];
+
+	for (i = 0; i < RTE_MAX_LCORE; i++) {
+		classifier_mng_info = g_classifier_mng_info + i;
+		if (! is_used_mng_info(classifier_mng_info))
+			continue;
+
+		classifier_info = classifier_mng_info->info + 
+				classifier_mng_info->ref_index;
+
+		classified_data = classifier_mng_info->classified_data;
+
+		RTE_LOG(DEBUG, SPP_CLASSIFIER_MAC,
+			"Core[%u] Start iterate classifier table.\n", i);
+
+		while(1) {
+			ret = rte_hash_iterate(classifier_info->classifier_table,
+					&key, &data, &next);
+
+			if (unlikely(ret < 0))
+				break;
+
+			ether_format_addr(mac_addr_str, sizeof(mac_addr_str),
+					(const struct ether_addr *)key);
+
+			port.if_type = (classified_data + (long)data)->if_type;
+			port.if_no   = (classified_data + (long)data)->if_no_global;
+
+			(*params->element_proc)(
+					params->opaque,
+					SPP_CLASSIFIER_TYPE_MAC,
+					mac_addr_str,
+					&port);
+		}
+	}
 
 	return 0;
 }

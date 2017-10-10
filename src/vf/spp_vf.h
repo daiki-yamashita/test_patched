@@ -82,4 +82,22 @@ int spp_update_classifier_table(enum spp_classifier_type type, const char *data,
  */
 int spp_flush(void);
 
+/* definition of iterated classifier element procedure function */
+typedef int (*spp_iterate_classifier_element_proc)(
+		void *opaque,
+		enum spp_classifier_type type,
+		const char *data,
+		const struct spp_config_port_info *port);
+
+/* iterate classifier table parameters */
+struct spp_iterate_classifier_table_params {
+	void *opaque;
+	spp_iterate_classifier_element_proc element_proc;
+};
+
+/*
+ * Iterate Classifier_table
+ */
+int spp_iterate_classifier_table(struct spp_iterate_classifier_table_params *params);
+
 #endif /* __SPP_VF_H__ */

@@ -877,6 +877,12 @@ ut_main(int argc, char *argv[])
 		}
 
 		/* 他機能部初期化 */
+		/* MAC振分初期化 */
+		int ret_classifier_mac_init = spp_classifier_mac_init();
+		if (unlikely(ret_classifier_mac_init != 0)) {
+			break;
+		}
+
 		/* コマンド機能部初期化 */
 		int ret_command_init = spp_command_proc_init(
 				g_startup_param.server_ip,
@@ -1128,5 +1134,21 @@ spp_flush(void)
 
 	/* 更新完了により変更したコアをクリア */
 	memset(g_change_core, 0x00, sizeof(g_change_core));
+	return SPP_RET_OK;
+}
+
+/*
+ * Iterate Classifier_table
+ */
+int spp_iterate_classifier_table(struct spp_iterate_classifier_table_params *params)
+{
+	int ret;
+
+	ret = spp_classifier_mac_iterate_table(params);
+	if (unlikely(ret != 0)) {
+		RTE_LOG(ERR, APP, "Cannot iterate classfier_mac_table.\n");
+		return SPP_RET_NG;
+	}
+
 	return SPP_RET_OK;
 }

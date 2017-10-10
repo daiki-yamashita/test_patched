@@ -109,6 +109,14 @@ int64_t spp_config_change_mac_str_to_int64(const char *mac);
 int spp_config_get_if_info(const char *port, enum port_type *if_type, int *if_no);
 
 /*
+ * Format port string form if-type/if-number
+ *
+ * OK : 0
+ * NG : -1
+ */
+int spp_config_format_if_info(char *port, enum port_type if_type, int if_no);
+
+/*
  * Load config file
  * OK : 0
  * NG : -1

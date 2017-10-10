@@ -3,6 +3,12 @@
 
 /* forward declaration */
 struct spp_core_info;
+struct spp_iterate_classifier_table_params;
+
+/**
+ * classifier(mac address) initialize globals.
+ */
+int spp_classifier_mac_init(void);
 
 /**
  * classifier(mac address) update component info.
@@ -22,5 +28,11 @@ int spp_classifier_mac_update(struct spp_core_info *core_info);
  *  pointer to struct spp_core_info.
  */
 int spp_classifier_mac_do(void *arg);
+
+/**
+ * classifier(mac address) iterate classifier table.
+ */
+int spp_classifier_mac_iterate_table(
+		struct spp_iterate_classifier_table_params *params);
 
 #endif /* _CLASSIFIER_MAC_H_ */

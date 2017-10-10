@@ -40,6 +40,7 @@ enum spp_command_type {
 	SPP_CMDTYPE_STOP,
 #endif
 	SPP_CMDTYPE_PROCESS,
+	SPP_CMDTYPE_STATUS,
 };
 
 #if 0 /* not supported yet */
@@ -93,6 +94,7 @@ struct spp_command_request {
 	struct spp_command commands[SPP_CMD_MAX_COMMANDS];
 
 	int is_requested_process;
+	int is_requested_status;
 };
 
 /* decode error information */

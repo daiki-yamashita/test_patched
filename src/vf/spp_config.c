@@ -198,6 +198,32 @@ spp_config_get_if_info(const char *port, enum port_type *if_type, int *if_no)
 }
 
 /*
+ * IF種別とIF番号からIF情報文字列を作成する
+ */
+int spp_config_format_if_info(char *port, enum port_type if_type, int if_no)
+{
+	const char* if_type_str;
+
+	switch (if_type) {
+	case PHY:
+		if_type_str = SPP_CONFIG_IFTYPE_NIC;
+		break;
+	case RING:
+		if_type_str = SPP_CONFIG_IFTYPE_RING;
+		break;
+	case VHOST:
+		if_type_str = SPP_CONFIG_IFTYPE_VHOST;
+		break;
+	default:
+		return -1;
+	}
+
+	sprintf(port, "%s%d", if_type_str, if_no);
+
+	return 0;
+}
+
+/*
  * MAC addressを文字列から数値へ変換
  */
 int64_t
