@@ -300,6 +300,12 @@ handle_l2multicast_packet(struct rte_mbuf *pkt,
 {
 	int i;
 
+	if (unlikely(classifier_info->num_active_classified == 0)) {
+		RTE_LOG(ERR, SPP_CLASSIFIER_MAC, "No mac address.\n");
+		rte_pktmbuf_free(pkt);
+		return;
+	}
+
 	rte_mbuf_refcnt_update(pkt, classifier_info->num_active_classified);
 
 	for (i= 0; i < classifier_info->num_active_classified; i++) {
