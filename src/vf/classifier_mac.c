@@ -311,7 +311,7 @@ handle_l2multicast_packet(struct rte_mbuf *pkt,
 	int i;
 
 	if (unlikely(classifier_info->num_active_classified == 0)) {
-		RTE_LOG(ERR, SPP_CLASSIFIER_MAC, "No mac address.\n");
+		RTE_LOG(ERR, SPP_CLASSIFIER_MAC, "No mac address.(l2multicast packet)\n");
 		rte_pktmbuf_free(pkt);
 		return;
 	}
