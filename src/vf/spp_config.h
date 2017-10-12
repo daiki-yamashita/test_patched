@@ -114,7 +114,7 @@ int spp_config_get_if_info(const char *port, enum port_type *if_type, int *if_no
  * OK : 0
  * NG : -1
  */
-int spp_config_format_if_info(char *port, enum port_type if_type, int if_no);
+int spp_config_format_port_string(char *port, enum port_type if_type, int if_no);
 
 /*
  * Load config file

@@ -235,7 +235,7 @@ int append_classifier_element_value(
 	json_t *parent_obj = (json_t *)opaque;
 
 	char port_str[64];
-	spp_config_format_if_info(port_str, port->if_type, port->if_no);
+	spp_config_format_port_string(port_str, port->if_type, port->if_no);
 
 	json_array_append_new(parent_obj, json_pack(
 			"{ssssss}",

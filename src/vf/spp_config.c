@@ -200,7 +200,7 @@ spp_config_get_if_info(const char *port, enum port_type *if_type, int *if_no)
 /*
  * IF種別とIF番号からIF情報文字列を作成する
  */
-int spp_config_format_if_info(char *port, enum port_type if_type, int if_no)
+int spp_config_format_port_string(char *port, enum port_type if_type, int if_no)
 {
 	const char* if_type_str;
 
