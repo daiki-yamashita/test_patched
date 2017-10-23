@@ -4,6 +4,9 @@
 /* max number of command per request */
 #define SPP_CMD_MAX_COMMANDS 32
 
+/* maximum number of parameters per command */
+#define SPP_CMD_MAX_PARAMETERS 8
+
 /* command name string buffer size (include null char) */
 #define SPP_CMD_NAME_BUFSZ  32
 
@@ -29,17 +32,9 @@ enum spp_command_decode_error_code {
 /* command type
 	do it same as the order of COMMAND_TYPE_STRINGS */
 enum spp_command_type {
-#if 0 /* not supported yet yet */
-	SPP_CMDTYPE_ADD,
-	SPP_CMDTYPE_COMPONENT,
-#endif
 	SPP_CMDTYPE_CLASSIFIER_TABLE,
 	SPP_CMDTYPE_FLUSH,
-#if 0 /* not supported yet */
-	SPP_CMDTYPE_FORWARD,
-	SPP_CMDTYPE_STOP,
-#endif
-	SPP_CMDTYPE_PROCESS,
+	SPP_CMDTYPE_CLIENT_ID,
 	SPP_CMDTYPE_STATUS,
 };
 
@@ -93,7 +88,7 @@ struct spp_command_request {
 	int num_valid_command;
 	struct spp_command commands[SPP_CMD_MAX_COMMANDS];
 
-	int is_requested_process;
+	int is_requested_client_id;
 	int is_requested_status;
 };
 

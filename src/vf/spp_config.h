@@ -6,7 +6,7 @@
 
 #define SPP_CONFIG_FILE_PATH "/usr/local/etc/spp/spp.json"
 
-#define SPP_CONFIG_IFTYPE_NIC   "nic"
+#define SPP_CONFIG_IFTYPE_NIC   "phy"
 #define SPP_CONFIG_IFTYPE_VHOST "vhost"
 #define SPP_CONFIG_IFTYPE_RING  "ring"
 

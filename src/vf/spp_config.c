@@ -162,18 +162,18 @@ spp_config_get_if_info(const char *port, enum port_type *if_type, int *if_no)
 	char *endptr = NULL;
 
 	/* IF type check */
-	if (strncmp(port, SPP_CONFIG_IFTYPE_NIC, strlen(SPP_CONFIG_IFTYPE_NIC)) == 0) {
+	if (strncmp(port, SPP_CONFIG_IFTYPE_NIC ":", strlen(SPP_CONFIG_IFTYPE_NIC)+1) == 0) {
 		/* NIC */
 		type = PHY;
-		no_str = &port[strlen(SPP_CONFIG_IFTYPE_NIC)];
-	} else if (strncmp(port, SPP_CONFIG_IFTYPE_VHOST, strlen(SPP_CONFIG_IFTYPE_VHOST)) == 0) {
+		no_str = &port[strlen(SPP_CONFIG_IFTYPE_NIC)+1];
+	} else if (strncmp(port, SPP_CONFIG_IFTYPE_VHOST ":", strlen(SPP_CONFIG_IFTYPE_VHOST)+1) == 0) {
 		/* VHOST */
 		type = VHOST;
-		no_str = &port[strlen(SPP_CONFIG_IFTYPE_VHOST)];
-	} else if (strncmp(port, SPP_CONFIG_IFTYPE_RING, strlen(SPP_CONFIG_IFTYPE_RING)) == 0) {
+		no_str = &port[strlen(SPP_CONFIG_IFTYPE_VHOST)+1];
+	} else if (strncmp(port, SPP_CONFIG_IFTYPE_RING ":", strlen(SPP_CONFIG_IFTYPE_RING)+1) == 0) {
 		/* RING */
 		type = RING;
-		no_str = &port[strlen(SPP_CONFIG_IFTYPE_RING)];
+		no_str = &port[strlen(SPP_CONFIG_IFTYPE_RING)+1];
 	} else {
 		/* OTHER */
 		RTE_LOG(ERR, APP, "Unknown interface type. (port = %s)\n", port);
@@ -218,7 +218,7 @@ int spp_config_format_port_string(char *port, enum port_type if_type, int if_no)
 		return -1;
 	}
 
-	sprintf(port, "%s%d", if_type_str, if_no);
+	sprintf(port, "%s:%d", if_type_str, if_no);
 
 	return 0;
 }

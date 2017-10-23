@@ -4,7 +4,7 @@
 #include "common.h"
 #include "spp_config.h"
 
-#define SPP_PROCESS_MAX 128
+#define SPP_CLIENT_MAX 128
 
 /*
  * State on core
@@ -60,10 +60,10 @@ struct spp_core_info {
 };
 
 /*
- * Get process ID
- * RETURN : PROCESS ID(0~127)
+ * Get client ID
+ * RETURN : CLIENT ID(0~127)
  */
-int spp_get_process_id(void);
+int spp_get_client_id(void);
 
 /*
  * Update Classifier_table

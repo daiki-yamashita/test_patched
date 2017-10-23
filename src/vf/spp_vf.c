@@ -23,13 +23,13 @@ enum SPP_LONGOPT_RETVAL {
 	/* add below */
 
 	SPP_LONGOPT_RETVAL_CONFIG,
-	SPP_LONGOPT_RETVAL_PROCESS_ID,
+	SPP_LONGOPT_RETVAL_CLIENT_ID,
 	SPP_LONGOPT_RETVAL_VHOST_CLIENT
 };
 
 /* struct */
 struct startup_param {
-	int process_id;
+	int client_id;
 	char server_ip[INET_ADDRSTRLEN];
 	int server_port;
 	int vhost_client;
@@ -70,11 +70,11 @@ static void
 usage(const char *progname)
 {
 	RTE_LOG(INFO, APP, "Usage: %s [EAL args] --"
-			" --process-id PROC_ID"
+			" --client-id CLIENT_ID"
 			" [--config CONFIG_FILE_PATH]"
 			" -s SERVER_IP:SERVER_PORT"
 			" [--vhost-client]\n"
-			" --process-id PROCESS_ID   : My process ID\n"
+			" --client-id CLIENT_ID   : My client ID\n"
 			" --config CONFIG_FILE_PATH : specific config file path\n"
 			" -s SERVER_IP:SERVER_PORT  : Access information to the server\n"
 			" --vhost-client            : Run vhost on client\n"
@@ -252,23 +252,23 @@ stop_process(int signal) {
 }
 
 /*
- * Parses the process ID of the application argument.
+ * Parses the client ID of the application argument.
  */
 static int
-parse_app_process_id(const char *process_id_str, int *process_id)
+parse_app_client_id(const char *client_id_str, int *client_id)
 {
 	int id = 0;
 	char *endptr = NULL;
 
-	id = strtol(process_id_str, &endptr, 0);
-	if (unlikely(process_id_str == endptr) || unlikely(*endptr != '\0'))
+	id = strtol(client_id_str, &endptr, 0);
+	if (unlikely(client_id_str == endptr) || unlikely(*endptr != '\0'))
 		return -1;
 
-	if (id >= SPP_PROCESS_MAX)
+	if (id >= SPP_CLIENT_MAX)
 		return -1;
 
-	*process_id = id;
-	RTE_LOG(DEBUG, APP, "Set process id = %d\n", *process_id);
+	*client_id = id;
+	RTE_LOG(DEBUG, APP, "Set client id = %d\n", *client_id);
 	return 0;
 }
 
@@ -314,7 +314,7 @@ parse_app_args(int argc, char *argv[])
 	const char *progname = argv[0];
 	static struct option lgopts[] = { 
 			{ "config", required_argument, NULL, SPP_LONGOPT_RETVAL_CONFIG },
-			{ "process-id", required_argument, NULL, SPP_LONGOPT_RETVAL_PROCESS_ID },
+			{ "client-id", required_argument, NULL, SPP_LONGOPT_RETVAL_CLIENT_ID },
 			{ "vhost-client", no_argument, NULL, SPP_LONGOPT_RETVAL_VHOST_CLIENT },
 			{ 0 },
 	};
@@ -340,8 +340,8 @@ parse_app_args(int argc, char *argv[])
 			}
 			strcpy(config_file_path, optarg);
 			break;
-		case SPP_LONGOPT_RETVAL_PROCESS_ID:
-			if (parse_app_process_id(optarg, &g_startup_param.process_id) != 0) {
+		case SPP_LONGOPT_RETVAL_CLIENT_ID:
+			if (parse_app_client_id(optarg, &g_startup_param.client_id) != 0) {
 				usage(progname);
 				return -1;
 			}
@@ -370,8 +370,8 @@ parse_app_args(int argc, char *argv[])
 		usage(progname);
 		return -1;
 	}
-	RTE_LOG(INFO, APP, "application arguments value. (process id = %d, config = %s, server = %s:%d, vhost client = %d)\n",
-			g_startup_param.process_id,
+	RTE_LOG(INFO, APP, "application arguments value. (client id = %d, config = %s, server = %s:%d, vhost client = %d)\n",
+			g_startup_param.client_id,
 			config_file_path,
 			g_startup_param.server_ip,
 			g_startup_param.server_port,
@@ -978,12 +978,12 @@ ut_main(int argc, char *argv[])
 }
 
 /*
- * Get process ID
+ * Get client ID
  */
 int
-spp_get_process_id(void)
+spp_get_client_id(void)
 {
-	return g_startup_param.process_id;
+	return g_startup_param.client_id;
 }
 
 /*

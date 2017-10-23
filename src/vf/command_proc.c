@@ -206,18 +206,18 @@ append_response_command_results_object(json_t *parent_obj,
 	return 0;
 }
 
-/* append process value to specified json object */
+/* append client id value to specified json object */
 static int
-append_response_process_value(json_t *parent_obj)
+append_response_client_id_value(json_t *parent_obj)
 {
 	int ret = -1;
 	json_t *proc_obj;
 
-	proc_obj = json_integer(spp_get_process_id());
+	proc_obj = json_integer(spp_get_client_id());
 	if (unlikely(proc_obj == NULL))
 		return -1;
 
-	ret = json_object_set_new(parent_obj, "process", proc_obj);
+	ret = json_object_set_new(parent_obj, "client_id", proc_obj);
 	if (unlikely(ret != 0))
 		return -1;
 
@@ -354,9 +354,9 @@ send_command_result_response(int *sock, const struct spp_command_request *reques
 		return;
 	}
 
-	/* append process information value */
-	if (request->is_requested_process) {
-		ret = append_response_process_value(top_obj);
+	/* append client id information value */
+	if (request->is_requested_client_id) {
+		ret = append_response_client_id_value(top_obj);
 		if (unlikely(ret != 0)) {
 			RTE_LOG(ERR, SPP_COMMAND_PROC, "Failed to make command result response.");
 			json_decref(top_obj);
@@ -459,14 +459,10 @@ spp_command_proc_do(void)
 {
 	int ret = -1;
 	int msg_ret = -1;
-	int i;
 
 	static int sock = -1;
 	static char *msgbuf = NULL;
 	static size_t msg_len = 0;
-
-	static size_t rb_cnt = 0;
-	static size_t lb_cnt = 0;
 
 	if (unlikely(msgbuf == NULL)) {
 		msgbuf = spp_strbuf_allocate(CMD_REQ_BUF_INIT_SIZE);
@@ -491,29 +487,9 @@ spp_command_proc_do(void)
 			return -1;
 	}
 
-	for (i = 0; i < msg_ret; ++i) {
-		switch (*(msgbuf + msg_len + i)) {
-		case '{':
-			++lb_cnt;
-			break;
-		case '}':
-			++rb_cnt;
-			break;
-		}
-
-		if (likely(lb_cnt != 0) && unlikely(rb_cnt == lb_cnt)) {
-			msg_len += (i + 1);
-			ret = process_request(&sock, msgbuf, msg_len);
-
-			spp_strbuf_remove_front(msgbuf, msg_len);
-			msg_ret = 0;
-			msg_len = 0;
-			rb_cnt = 0;
-			lb_cnt = 0;
-		}
-	}
-
-	msg_len = msg_len + msg_ret;
+	msg_len += (msg_ret + 1);
+	ret = process_request(&sock, msgbuf, msg_len);
+	spp_strbuf_remove_front(msgbuf, msg_len);
 
 	return 0;
 }
