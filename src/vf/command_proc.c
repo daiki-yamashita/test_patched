@@ -462,7 +462,6 @@ spp_command_proc_do(void)
 
 	static int sock = -1;
 	static char *msgbuf = NULL;
-	static size_t msg_len = 0;
 
 	if (unlikely(msgbuf == NULL)) {
 		msgbuf = spp_strbuf_allocate(CMD_REQ_BUF_INIT_SIZE);
@@ -487,9 +486,8 @@ spp_command_proc_do(void)
 			return -1;
 	}
 
-	msg_len += (msg_ret + 1);
-	ret = process_request(&sock, msgbuf, msg_len);
-	spp_strbuf_remove_front(msgbuf, msg_len);
+	ret = process_request(&sock, msgbuf, msg_ret);
+	spp_strbuf_remove_front(msgbuf, msg_ret);
 
 	return 0;
 }

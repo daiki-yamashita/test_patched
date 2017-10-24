@@ -63,7 +63,7 @@ static int
 get_arrary_index(const char *match, const char *list[])
 {
 	int i;
-	for (i = 0; list[i][0] == '\0'; i++) {
+	for (i = 0; list[i][0] != '\0'; i++) {
 		if (strcmp(list[i], match) == 0)
 			return i;
 	}
@@ -113,7 +113,7 @@ decode_classifier_type_value(void *output, const char *arg_val)
 {
         int ret = 0;
 	ret = get_arrary_index(arg_val, CLASSIFILER_TYPE_STRINGS);
-        if (unlikely(ret < 0)) {
+        if (unlikely(ret <= 0)) {
                 RTE_LOG(ERR, SPP_COMMAND_PROC, "Unknown classifier type. val=%s\n", arg_val);
                 return -1;
         }
@@ -196,13 +196,14 @@ check_comand_argment_in_list(struct spp_command_request *request,
 	int ci = request->commands[0].type;
 	int pi = 0;
 	static struct decode_parameter_list *list = NULL;
-	for(pi = 1; pi < argc-1; pi++) {
-		list = &parameter_list[ci][pi];
+	for(pi = 1; pi < argc; pi++) {
+		list = &parameter_list[ci][pi-1];
+RTE_LOG(ERR, SPP_COMMAND_PROC, "TEST: command=%s, name=%s, index=%d, value=%s\n", argv[0], list->name, pi, argv[pi]);
 		ret = (*list->func)((void *)((char*)&request->commands[0]+list->offset), argv[pi]);
 		if (unlikely(ret < 0)) {
 			RTE_LOG(ERR, SPP_COMMAND_PROC,
-					"Bad value. command = %s, name=%s, index=%d\n",
-					argv[0], list->name, pi);
+					"Bad value. command=%s, name=%s, index=%d, value=%s\n",
+					argv[0], list->name, pi, argv[pi]);
 			return set_string_value_decode_error(error, argv[pi], list->name);
 		}
 	}
@@ -241,8 +242,6 @@ decode_command_argment(struct spp_command_request *request,
 	memset(argv, 0x00, sizeof(argv));
 	memset(tmp_str, 0x00, sizeof(tmp_str));
 
-	request->num_command = 1;
-
 	strcpy(tmp_str, request_str);
 	decode_argument_value(tmp_str, &argc, argv);
 	RTE_LOG(DEBUG, SPP_COMMAND_PROC, "Decode array. num=%d\n", argc);
@@ -279,14 +278,18 @@ spp_command_decode_request(struct spp_command_request *request, const char *requ
 	int ret = -1;
 	int i;
 
+RTE_LOG(ERR, SPP_COMMAND_PROC, "ERROR:request_str=%s\n", request_str);
 	/* decode request */
+	request->num_command = 1;
 	ret = decode_command_argment(request, request_str, error);
-	if (unlikely(ret < 0)) {
+	if (unlikely(ret != 0)) {
 		RTE_LOG(ERR, SPP_COMMAND_PROC, "Cannot decode command request. "
 				"ret=%d, request_str=%.*s\n", 
 				ret, (int)request_str_len, request_str);
 		return ret;
 	}
+	request->num_valid_command = 1;
+RTE_LOG(ERR, SPP_COMMAND_PROC, "ERROR:command type=%d\n", request->commands[0].type);
 
 	/* check getter command */
 	for (i = 0; i < request->num_valid_command; ++i) {
