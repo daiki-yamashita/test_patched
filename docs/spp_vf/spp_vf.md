@@ -29,11 +29,15 @@ by looking MAC address in the packet..
 
 ## Build the Application
 
-See [setup guide](setup.md).
+See [setup guide](setup_guide.md).
 
 ## Running the Application
 
 See [how to use](how_to_use.md).
+
+## Sample Usage
+
+See [sample usage](sample_usage.md).
 
 ## Explanation
 

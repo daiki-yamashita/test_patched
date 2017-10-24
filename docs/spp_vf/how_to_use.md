@@ -14,7 +14,7 @@ SPP_VF is a SR-IOV like network functionality for NFV.
 
 ## Launch SPP
 
-Before launching spp, you need to setup described as [setup guide](setup.md).
+Before launching spp, you need to setup described as [setup guide](setup_guide.md).
 
 ### SPP Controller
 
