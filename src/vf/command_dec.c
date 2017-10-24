@@ -198,7 +198,6 @@ check_comand_argment_in_list(struct spp_command_request *request,
 	static struct decode_parameter_list *list = NULL;
 	for(pi = 1; pi < argc; pi++) {
 		list = &parameter_list[ci][pi-1];
-RTE_LOG(ERR, SPP_COMMAND_PROC, "TEST: command=%s, name=%s, index=%d, value=%s\n", argv[0], list->name, pi, argv[pi]);
 		ret = (*list->func)((void *)((char*)&request->commands[0]+list->offset), argv[pi]);
 		if (unlikely(ret < 0)) {
 			RTE_LOG(ERR, SPP_COMMAND_PROC,
@@ -278,7 +277,6 @@ spp_command_decode_request(struct spp_command_request *request, const char *requ
 	int ret = -1;
 	int i;
 
-RTE_LOG(ERR, SPP_COMMAND_PROC, "ERROR:request_str=%s\n", request_str);
 	/* decode request */
 	request->num_command = 1;
 	ret = decode_command_argment(request, request_str, error);
@@ -289,7 +287,6 @@ RTE_LOG(ERR, SPP_COMMAND_PROC, "ERROR:request_str=%s\n", request_str);
 		return ret;
 	}
 	request->num_valid_command = 1;
-RTE_LOG(ERR, SPP_COMMAND_PROC, "ERROR:command type=%d\n", request->commands[0].type);
 
 	/* check getter command */
 	for (i = 0; i < request->num_valid_command; ++i) {
