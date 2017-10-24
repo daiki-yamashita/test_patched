@@ -43,7 +43,7 @@ TODO(yasufum) add description for sec.
   -c 0x00fd -n 4 --proc-type=secondary \
   -- \
   --process-id 1 \
-  --config $SPRINT_REVIEW_HOME/spp_vf1_without_cmtab.json \
+  --config /path/to/spp_vf1_without_cmtab.json \
   -s 127.0.0.1:11111
 
   # start nc for secondary 2
@@ -54,11 +54,11 @@ TODO(yasufum) add description for sec.
   -c 0x3f01 -n 4 --proc-type=secondary \
   -- \
   --process-id 2 \
-  --config $SPRINT_REVIEW_HOME/spp_vf2_without_cmtab.json \
+  --config /path/to/spp_vf2_without_cmtab.json \
   -s 127.0.0.1:11112
   ```
 
-### Setup network configuration for VMs.
+### Setup network configuration for VMs
 
 Start two VMs.
 
