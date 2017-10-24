@@ -7,6 +7,8 @@ It enables to access to VMs with ssh from a remote node.
 Before trying this sample, install SPP by following
 [setup guide](setup_guide.md).
 
+![spp_sample_usage](spp_sample_usage.svg)
+
 ## Testing Steps
 
 In this section, you configure spp_vf and client applications for
