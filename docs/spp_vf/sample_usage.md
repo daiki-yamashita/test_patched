@@ -74,7 +74,7 @@ To not ask for unknown keys while login VMs,
 set `-oStrictHostKeyChecking=no` option for ssh.
 
   ```sh
-  $ ssh -oStrictHostKeyChecking=no ntt@192.168.122.31
+  $ ssh -oStrictHostKeyChecking=no sppuser@192.168.122.31
   ```
 
 Up interfaces for vhost and register them to arp table inside spp-vm1.
@@ -83,12 +83,12 @@ after configuration is done.
 
   ```sh
   # up interfaces
-  $ sudo ifconfig ens4 inet 192.168.240.21 netmask 255.255.255.0 up
-  $ sudo ifconfig ens5 inet 192.168.250.22 netmask 255.255.255.0 up
+  $ sudo ifconfig ens4 inet 192.168.140.21 netmask 255.255.255.0 up
+  $ sudo ifconfig ens5 inet 192.168.150.22 netmask 255.255.255.0 up
 
   # register to arp table
-  $ sudo arp -s 192.168.240.11 a0:36:9f:78:86:78 -i ens4
-  $ sudo arp -s 192.168.250.13 a0:36:9f:6c:ed:bc -i ens5
+  $ sudo arp -s 192.168.140.11 a0:36:9f:78:86:78 -i ens4
+  $ sudo arp -s 192.168.150.13 a0:36:9f:6c:ed:bc -i ens5
 
   # diable TCP offload
   $ sudo ethtool -K ens4 tx off
@@ -98,15 +98,15 @@ after configuration is done.
 Configurations for spp-vm2 is same as spp-vm1.
 
   ```sh
-  $ ssh -oStrictHostKeyChecking=no ntt@192.168.122.32
+  $ ssh -oStrictHostKeyChecking=no sppuser@192.168.122.32
 
   # up interfaces
-  $ sudo ifconfig ens4 inet 192.168.240.31 netmask 255.255.255.0 up
-  $ sudo ifconfig ens5 inet 192.168.250.32 netmask 255.255.255.0 up
+  $ sudo ifconfig ens4 inet 192.168.140.31 netmask 255.255.255.0 up
+  $ sudo ifconfig ens5 inet 192.168.150.32 netmask 255.255.255.0 up
 
   # register to arp table
-  $ sudo arp -s 192.168.240.11 a0:36:9f:78:86:78 -i ens4
-  $ sudo arp -s 192.168.250.13 a0:36:9f:6c:ed:bc -i ens5
+  $ sudo arp -s 192.168.140.11 a0:36:9f:78:86:78 -i ens4
+  $ sudo arp -s 192.168.150.13 a0:36:9f:6c:ed:bc -i ens5
 
   # diable TCP offload
   $ sudo ethtool -K ens4 tx off
@@ -123,19 +123,6 @@ discarding packets.
 TODO(yasufum) json-based steps are deprecated.
 
 ### Register MAC address to Classifier
-
-Send a request for getting each of process IDs with nc command.
-TODO(yasufum) for what?
-
-  ```sh
-  {
-    "commands": [
-      {
-        "command": "process"
-      }
-    ]
-  }
-  ```
 
 Register MAC addresses to classifier.
 
@@ -183,16 +170,16 @@ Now, you can login VMs.
 
   ```sh
   # spp-vm1 via NIC0
-  $ ssh ntt@192.168.240.21
+  $ ssh sppuser@192.168.140.21
 
   # spp-vm1 via NIC1
-  $ ssh ntt@192.168.250.22
+  $ ssh sppuser@192.168.150.22
 
   # spp-vm2 via NIC0
-  $ ssh ntt@192.168.240.31
+  $ ssh sppuser@192.168.140.31
 
   # spp-vm2 via NIC1
-  $ ssh ntt@192.168.250.32
+  $ ssh sppuser@192.168.150.32
   ```
 
 If you unregister the addresses, send request as following.
