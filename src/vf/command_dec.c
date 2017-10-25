@@ -41,21 +41,26 @@ set_string_value_decode_error(struct spp_command_decode_error *error,
 	return set_decode_error(error, SPP_CMD_DERR_BAD_VALUE, error_name);
 }
 
-/* Split command line arguments with spaces */
-static void
-decode_argument_value(char *string, int *argc, char *argv[])
+/* Split command line parameter with spaces */
+static int
+decode_parameter_value(char *string, int max, int *argc, char *argv[])
 {
 	int cnt = 0;
 	const char *delim = " ";
 	char *argv_tok = NULL;
+	char *saveptr = NULL;
 
-	argv_tok = strtok(string, delim);
+	argv_tok = strtok_r(string, delim, &saveptr);
 	while(argv_tok != NULL) {
+		if (cnt >= max)
+			return -1;
 		argv[cnt] = argv_tok;
 		cnt++;
-		argv_tok = strtok(NULL, delim);
+		argv_tok = strtok_r(NULL, delim, &saveptr);
 	}
 	*argc = cnt;
+
+	return 0;
 }
 
 /* Get index of array */
@@ -124,7 +129,7 @@ decode_classifier_type_value(void *output, const char *arg_val)
 
 /* decode procedure for classifier value */
 static int
-decode_classifiert_value_value(void *output, const char *arg_val)
+decode_classifier_value_value(void *output, const char *arg_val)
 {
         int ret = -1;
 	struct spp_command_classifier_table *classifier_table = output;
@@ -153,6 +158,8 @@ decode_classifier_port_value(void *output, const char *arg_val)
 	return decode_port_value(port, arg_val);
 }
 
+#define DECODE_PARAMETER_LIST_EMPTY { NULL, 0, NULL }
+
 /* parameter list for decoding */
 struct decode_parameter_list {
         const char *name;
@@ -162,7 +169,7 @@ struct decode_parameter_list {
 
 /* parameter list for each command */
 static struct decode_parameter_list parameter_list[][SPP_CMD_MAX_PARAMETERS] = {
-	{                      /* classifier_table */
+	{                                /* classifier_table */
 		{
 			.name = "type",
 			.offset = offsetof(struct spp_command, spec.classifier_table.type),
@@ -171,24 +178,24 @@ static struct decode_parameter_list parameter_list[][SPP_CMD_MAX_PARAMETERS] = {
 		{
 			.name = "value",
 			.offset = offsetof(struct spp_command, spec.classifier_table),
-			.func = decode_classifiert_value_value
+			.func = decode_classifier_value_value
 		},
 		{
 			.name = "port",
 			.offset = offsetof(struct spp_command, spec.classifier_table.port),
 			.func = decode_classifier_port_value
 		},
-		{ NULL, 0, NULL },
+		DECODE_PARAMETER_LIST_EMPTY,
 	},
-	{ { NULL, 0, NULL } }, /* flush            */
-	{ { NULL, 0, NULL } }, /* _get_client_id   */
-	{ { NULL, 0, NULL } }, /* status           */
-	{ { NULL, 0, NULL } }, /* termination      */
+	{ DECODE_PARAMETER_LIST_EMPTY }, /* flush            */
+	{ DECODE_PARAMETER_LIST_EMPTY }, /* _get_client_id   */
+	{ DECODE_PARAMETER_LIST_EMPTY }, /* status           */
+	{ DECODE_PARAMETER_LIST_EMPTY }, /* termination      */
 };
 
-/* check by list for each command line argument */
+/* check by list for each command line parameter */
 static int
-check_comand_argment_in_list(struct spp_command_request *request,
+decode_comand_parameter_in_list(struct spp_command_request *request,
 				int argc, char *argv[],
 				struct spp_command_decode_error *error)
 {
@@ -220,19 +227,20 @@ struct decode_command_list {
 
 /* command list */
 static struct decode_command_list command_list[] = {
-	{ "classifier_table", 4, 4, check_comand_argment_in_list }, /* classifier_table */
-	{ "flush",            1, 1, NULL                         }, /* flush            */
-	{ "_get_client_id",   1, 1, NULL                         }, /* _get_client_id   */
-	{ "status",           1, 1, NULL                         }, /* status           */
-	{ "",                 0, 0, NULL                         }  /* termination      */
+	{ "classifier_table", 4, 4, decode_comand_parameter_in_list }, /* classifier_table */
+	{ "flush",            1, 1, NULL                            }, /* flush            */
+	{ "_get_client_id",   1, 1, NULL                            }, /* _get_client_id   */
+	{ "status",           1, 1, NULL                            }, /* status           */
+	{ "",                 0, 0, NULL                            }  /* termination      */
 };
 
-/* Decode command line arguments */
+/* Decode command line parameters */
 static int
-decode_command_argment(struct spp_command_request *request,
+decode_command_in_list(struct spp_command_request *request,
 			const char *request_str,
 			struct spp_command_decode_error *error)
 {
+	int ret = 0;
 	struct decode_command_list *list = NULL;
 	int i = 0;
 	int argc = 0;
@@ -242,7 +250,12 @@ decode_command_argment(struct spp_command_request *request,
 	memset(tmp_str, 0x00, sizeof(tmp_str));
 
 	strcpy(tmp_str, request_str);
-	decode_argument_value(tmp_str, &argc, argv);
+	ret = decode_parameter_value(tmp_str, SPP_CMD_MAX_PARAMETERS, &argc, argv);
+	if (ret < 0) {
+		RTE_LOG(ERR, SPP_COMMAND_PROC, "Parameter number over limit."
+				"request_str=%s\n", request_str);
+		return set_decode_error(error, SPP_CMD_DERR_BAD_FORMAT, NULL);
+	}
 	RTE_LOG(DEBUG, SPP_COMMAND_PROC, "Decode array. num=%d\n", argc);
 
 	for (i = 0; command_list[i].name[0] != '\0'; i++) {
@@ -279,7 +292,7 @@ spp_command_decode_request(struct spp_command_request *request, const char *requ
 
 	/* decode request */
 	request->num_command = 1;
-	ret = decode_command_argment(request, request_str, error);
+	ret = decode_command_in_list(request, request_str, error);
 	if (unlikely(ret != 0)) {
 		RTE_LOG(ERR, SPP_COMMAND_PROC, "Cannot decode command request. "
 				"ret=%d, request_str=%.*s\n", 
