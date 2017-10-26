@@ -554,6 +554,17 @@ int spp_classifier_mac_iterate_table(
 		RTE_LOG(DEBUG, SPP_CLASSIFIER_MAC,
 			"Core[%u] Start iterate classifier table.\n", i);
 
+		if (classifier_info->default_classified >= 0) {
+			port.if_type = (classified_data + classifier_info->default_classified)->if_type;
+			port.if_no   = (classified_data + classifier_info->default_classified)->if_no_global;
+
+			(*params->element_proc)(
+					params->opaque,
+					SPP_CLASSIFIER_TYPE_MAC,
+					SPP_CONFIG_DEFAULT_CLASSIFIED_SPEC_STR,
+					&port);
+		}
+
 		while(1) {
 			ret = rte_hash_iterate(classifier_info->classifier_table,
 					&key, &data, &next);
