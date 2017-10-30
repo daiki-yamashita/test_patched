@@ -34,10 +34,16 @@ First, launch spp controller and primary process.
   -p 0x03 -n 8 -s 127.0.0.1:5555
   ```
 
-TODO(yasufum) add description for sec.
+After primary process is launched, run nc command for each of
+seconrdary processes and itselves.
+In this sample, commands for secondary are sent from nc because
+`spp.py` does not support commands for spp_vf.
+nc is a network utility and it can open TCP connections, send UDP
+packets, listen on arbitrary TCP and UDP ports, do port scanning,
+and deal with both IPv4 and IPv6.
 
   ```sh
-  # start nc for secondary 1
+  # run nc for secondary 1 with port 11111
   $ while true; do nc -l 11111; done
 
   # start secondary 1
@@ -48,7 +54,7 @@ TODO(yasufum) add description for sec.
   --config /path/to/spp_vf1_without_cmtab.json \
   -s 127.0.0.1:11111
 
-  # start nc for secondary 2
+  # run nc for secondary 2 with port 11112
   $ while true; do nc -l 11112; done
 
   # start secondary 2
@@ -120,7 +126,7 @@ discarding packets.
 
 ## Test Application
 
-TODO(yasufum) json-based steps are deprecated.
+TODO(yasufum) json-based steps will be deprecated.
 
 ### Register MAC address to Classifier
 
