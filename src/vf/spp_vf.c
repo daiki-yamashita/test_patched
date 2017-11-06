@@ -12,7 +12,7 @@
 #include "spp_forward.h"
 #include "command_proc.h"
 
-/* define */
+/* TODO(yasufum) add desc how there are used */
 #define SPP_CORE_STATUS_CHECK_MAX 5
 #define SPP_RING_LATENCY_STATS_SAMPLING_INTERVAL 1000000
 
@@ -21,13 +21,13 @@ enum SPP_LONGOPT_RETVAL {
 	SPP_LONGOPT_RETVAL__ = 127,
 
 	/* add below */
-
+	/* TODO(yasufum) add description what and why add below */
 	SPP_LONGOPT_RETVAL_CONFIG,
 	SPP_LONGOPT_RETVAL_CLIENT_ID,
 	SPP_LONGOPT_RETVAL_VHOST_CLIENT
 };
 
-/* struct */
+/* Manage given options as global variable */
 struct startup_param {
 	int client_id;
 	char server_ip[INET_ADDRSTRLEN];
@@ -35,9 +35,10 @@ struct startup_param {
 	int vhost_client;
 };
 
+/* Status of patch and its cores, mac address assinged for it and port info */
 struct patch_info {
 	int      use_flg;
-	int      dpdk_port;
+	int      dpdk_port;  /* TODO(yasufum) add desc for what is this */
 	int      rx_core_no;
 	int      tx_core_no;
 	char     mac_addr_str[SPP_CONFIG_STR_LEN];
@@ -46,6 +47,8 @@ struct patch_info {
 	struct   spp_core_port_info *tx_core;
 };
 
+/* Manage number of interfaces and patch information  as global variable */
+/* TODO(yasufum) refactor, change if to iface */
 struct if_info {
 	int num_nic;
 	int num_vhost;
@@ -55,17 +58,16 @@ struct if_info {
 	struct patch_info ring_patchs[RTE_MAX_ETHPORTS];
 };
 
+/* Declare global variables */
 static struct spp_config_area	g_config;
 static struct startup_param	g_startup_param;
 static struct if_info		g_if_info;
 static struct spp_core_info	g_core_info[SPP_CONFIG_CORE_MAX];
-static int 			g_change_core[SPP_CONFIG_CORE_MAX];
+static int 			g_change_core[SPP_CONFIG_CORE_MAX];  /* TODO(yasufum) add desc how it is used and why changed core is kept */
 
 static char config_file_path[PATH_MAX];
 
-/*
- * print a usage message
- */
+/* Print help message */
 static void
 usage(const char *progname)
 {
@@ -81,16 +83,13 @@ usage(const char *progname)
 			, progname);
 }
 
-/*
- * Set RING PMD
- */
 static int
 add_ring_pmd(int ring_id)
 {
 	struct rte_ring *ring;
 	int ring_port_id;
 
-	/* look up ring, based on user's provided id*/
+	/* Lookup ring of given id */
 	ring = rte_ring_lookup(get_rx_queue_name(ring_id));
 	if (unlikely(ring == NULL)) {
 		RTE_LOG(ERR, APP,
@@ -98,16 +97,13 @@ add_ring_pmd(int ring_id)
 		return -1;
 	}
 
-	/* create ring pmd*/
+	/* Create ring pmd */
 	ring_port_id = rte_eth_from_ring(ring);
 	RTE_LOG(DEBUG, APP, "ring port id %d\n", ring_port_id);
 
 	return ring_port_id;
 }
 
-/*
- * Set VHOST PMD
- */
 static int
 add_vhost_pmd(int index, int client)
 {
@@ -187,27 +183,31 @@ add_vhost_pmd(int index, int client)
 	return vhost_port_id;
 }
 
-/*
- * Check core status
+/**
+ * Check status of all of cores is same as given
+ *
+ * It returns -1 as status mismatch if status is not same.
+ * If status is SPP_CONFIG_UNUSE, check is skipped.
  */
 static int
 check_core_status(enum spp_core_status status)
 {
-	int cnt;
+	int cnt;  /* increment core id */
 	for (cnt = 0; cnt < SPP_CONFIG_CORE_MAX; cnt++) {
 		if (g_core_info[cnt].type == SPP_CONFIG_UNUSE) {
 			continue;
 		}
 		if (g_core_info[cnt].status != status) {
-			/* Status mismatch */
+			/* Status is mismatched */
 			return -1;
 		}
 	}
 	return 0;
 }
 
-/*
- * Wait for core status check
+/**
+ * Run check_core_status() for SPP_CORE_STATUS_CHECK_MAX times with
+ * interval time (1sec)
  */
 static int
 check_core_status_wait(enum spp_core_status status)
@@ -225,34 +225,35 @@ check_core_status_wait(enum spp_core_status status)
 	return -1;
 }
 
-/*
- * Set core status
- */
+/* Set all core to given status */
 static void
 set_core_status(enum spp_core_status status)
 {
-	int core_cnt = 0;
+	int core_cnt = 0;  /* increment core id */
 	for(core_cnt = 0; core_cnt < SPP_CONFIG_CORE_MAX; core_cnt++) {
 		g_core_info[core_cnt].status = status;
 	}
 }
 
-/*
- * Process stop
+/**
+ * Set all of core status to SPP_CORE_STOP_REQUEST if received signal
+ * is SIGTERM or SIGINT
  */
 static void
 stop_process(int signal) {
 	if (unlikely(signal != SIGTERM) &&
 			unlikely(signal != SIGINT)) {
-		/* Other signals */
 		return;
 	}
 
 	set_core_status(SPP_CORE_STOP_REQUEST);
 }
 
-/*
- * Parses the client ID of the application argument.
+/**
+ * Convert string of given client id to inteter
+ *
+ * If succeeded, client id of interger is assigned to client_id and
+ * reuturn 0. Or return -1 if failed.
  */
 static int
 parse_app_client_id(const char *client_id_str, int *client_id)
@@ -272,9 +273,7 @@ parse_app_client_id(const char *client_id_str, int *client_id)
 	return 0;
 }
 
-/*
- * Parses server information of application arguments.
- */
+/* Parse options for server ip and port */
 static int
 parse_app_server(const char *server_str, char *server_ip, int *server_port)
 {
@@ -299,9 +298,7 @@ parse_app_server(const char *server_str, char *server_ip, int *server_port)
 	return 0;
 }
 
-/*
- * Parse the application arguments to the client app.
- */
+/* Parse options for client app */
 static int
 parse_app_args(int argc, char *argv[])
 {
@@ -319,7 +316,10 @@ parse_app_args(int argc, char *argv[])
 			{ 0 },
 	};
 
-	/* getoptを使用するとargvが並び変わるみたいなので、コピーを実施 */
+	/**
+	 * Save argv to argvopt to aovid loosing the order of options
+	 * by getopt_long()
+	 */
 	for (cnt = 0; cnt < argcopt; cnt++) {
 		argvopt[cnt] = argv[cnt];
 	}
@@ -327,7 +327,7 @@ parse_app_args(int argc, char *argv[])
 	/* Clear startup parameters */
 	memset(&g_startup_param, 0x00, sizeof(g_startup_param));
 
-	/* Check application parameter */
+	/* Check options of application */
 	optind = 0;
 	opterr = 0;
 	while ((opt = getopt_long(argc, argvopt, "s:", lgopts,
@@ -370,7 +370,8 @@ parse_app_args(int argc, char *argv[])
 		usage(progname);
 		return -1;
 	}
-	RTE_LOG(INFO, APP, "application arguments value. (client id = %d, config = %s, server = %s:%d, vhost client = %d)\n",
+	RTE_LOG(INFO, APP,
+			"app opts (client_id=%d,config=%s,server=%s:%d,vhost_client=%d)\n",
 			g_startup_param.client_id,
 			config_file_path,
 			g_startup_param.server_ip,
@@ -379,8 +380,13 @@ parse_app_args(int argc, char *argv[])
 	return 0;
 }
 
-/*
- * IF種別＆IF番号のIF情報の領域取得
+/**
+ * Return patch info of given type and num of interface
+ *
+ * It returns NULL value if given type is invalid.
+ * TODO(yasufum) refactor name of func to be more understandable (area?)
+ * TODO(yasufum) refactor, change if to iface.
+ * TODO(yasufum) confirm why it returns not -1 but NULL.
  */
 static struct patch_info *
 get_if_area(enum port_type if_type, int if_no)
@@ -396,19 +402,20 @@ get_if_area(enum port_type if_type, int if_no)
 		return &g_if_info.ring_patchs[if_no];
 		break;
 	default:
-		/* エラー出力は呼び元でチェック */
 		return NULL;
 		break;
 	}
 }
 
-/*
- * IF情報初期化
+/**
+ * Initialize all of patch info by assingning -1
+ *
+ * TODO(yasufum) refactor, change if to iface.
  */
 static void
 init_if_info(void)
 {
-	int port_cnt;
+	int port_cnt;  /* increment ether ports */
 	memset(&g_if_info, 0x00, sizeof(g_if_info));
 	for (port_cnt = 0; port_cnt < RTE_MAX_ETHPORTS; port_cnt++) {
 		g_if_info.nic_patchs[port_cnt].rx_core_no   = -1;
@@ -420,8 +427,11 @@ init_if_info(void)
 	}
 }
 
-/*
- * CORE情報初期化
+/**
+ * Initialize g_core_info and its port info
+ *
+ * Clear g_core_info and set interface type of its port info to UNDEF.
+ * TODO(yasufum) refactor, change if to iface.
  */
 static void
 init_core_info(void)
@@ -438,13 +448,15 @@ init_core_info(void)
 	memset(g_change_core, 0x00, sizeof(g_change_core));
 }
 
-/*
- * Configのプロセス情報から管理情報に設定
+/**
+ * Set properties of g_core_info from config
+ *
+ * TODO(yasufum) refactor, change if to iface.
+ * TODO(yasufum) confirm meaning of funciton name and is typo ?
  */
 static int
 set_form_proc_info(struct spp_config_area *config)
 {
-	/* Configのproc_infoから内部管理情報へ設定 */
 	int core_cnt, rx_start, rx_cnt, tx_start, tx_cnt;
 	enum port_type if_type;
 	int if_no;
@@ -459,17 +471,17 @@ set_form_proc_info(struct spp_config_area *config)
 			continue;
 		}
 
-		/* Forwardをまとめる事は可、他種別は不可 */
-		if ((core_info->type != SPP_CONFIG_UNUSE) &&
-				((core_info->type != SPP_CONFIG_FORWARD) ||
-				(core_func->type != SPP_CONFIG_FORWARD))) {
-			RTE_LOG(ERR, APP, "Core in use. (core = %d, type = %d/%d)\n",
-					core_func->core_no,
-					core_func->type, core_info->type);
-			return -1;
-		}
+    /* Forwardをまとめる事は可、他種別は不可 */
+    /* TODO(yasufum) confirm what is the purpose and meaning */
+    if ((core_info->type != SPP_CONFIG_UNUSE) &&
+        ((core_info->type != SPP_CONFIG_FORWARD) ||
+         (core_func->type != SPP_CONFIG_FORWARD))) {
+      RTE_LOG(ERR, APP, "Core in use. (core = %d, type = %d/%d)\n",
+          core_func->core_no,
+          core_func->type, core_info->type);
+      return -1;
+    }
 
-		/* Set CORE type */
 		core_info->type = core_func->type;
 		if (!rte_lcore_is_enabled(core_func->core_no)) {
 			/* CPU mismatch */
@@ -478,7 +490,6 @@ set_form_proc_info(struct spp_config_area *config)
 			return -1;
 		}
 
-		/* Set RX port */
 		rx_start = core_info->num_rx_port;
 		core_info->num_rx_port += core_func->num_rx_port;
 		for (rx_cnt = 0; rx_cnt < core_func->num_rx_port; rx_cnt++) {
@@ -488,7 +499,7 @@ set_form_proc_info(struct spp_config_area *config)
 			core_info->rx_ports[rx_start + rx_cnt].if_type = if_type;
 			core_info->rx_ports[rx_start + rx_cnt].if_no   = if_no;
 
-			/* IF種別とIF番号に対応するIF情報の領域取得 */
+			/* Retrieve patch corresponding to type and number of the interface */
 			patch_info = get_if_area(if_type, if_no);
 
 			patch_info->use_flg = 1;
@@ -499,6 +510,7 @@ set_form_proc_info(struct spp_config_area *config)
 			}
 
 			/* IF情報からCORE情報を変更する場合用に設定 */
+      /* TODO(yasufum) confirm the meaning of this comment */
 			patch_info->rx_core_no = core_func->core_no;
 			patch_info->rx_core    = &core_info->rx_ports[rx_start + rx_cnt];
 		}
@@ -513,7 +525,6 @@ set_form_proc_info(struct spp_config_area *config)
 			core_info->tx_ports[tx_start + tx_cnt].if_type = if_type;
 			core_info->tx_ports[tx_start + tx_cnt].if_no   = if_no;
 
-			/* IF種別とIF番号に対応するIF情報の領域取得 */
 			patch_info = get_if_area(if_type, if_no);
 
 			patch_info->use_flg = 1;
@@ -524,6 +535,7 @@ set_form_proc_info(struct spp_config_area *config)
 			}
 
 			/* IF情報からCORE情報を変更する場合用に設定 */
+      /* TODO(yasufum) confirm the meaning of this comment */
 			patch_info->tx_core_no = core_func->core_no;
 			patch_info->tx_core    = &core_info->tx_ports[tx_start + tx_cnt];
 		}
@@ -532,13 +544,15 @@ set_form_proc_info(struct spp_config_area *config)
 	return 0;
 }
 
-/*
- * ConfigのMACテーブル情報から管理情報に設定
+/**
+ * Load mac table entries from config and setup patches
+ *
+ * TODO(yasufum) refactor, change if to iface.
+ * TODO(yasufum) confirm if additional description for the structure of mac table is needed.
  */
 static int
 set_from_classifier_table(struct spp_config_area *config)
 {
-	/* MAC table */
 	enum port_type if_type;
 	int if_no = 0;
 	int mac_cnt = 0;
@@ -550,7 +564,7 @@ set_from_classifier_table(struct spp_config_area *config)
 		if_type = mac_table->port.if_type;
 		if_no   = mac_table->port.if_no;
 
-		/* IF種別とIF番号に対応するIF情報の領域取得 */
+    /* Retrieve patch corresponding to type and number of the interface */
 		patch_info = get_if_area(if_type, if_no);
 
 		if (unlikely(patch_info->use_flg == 0)) {
@@ -559,8 +573,7 @@ set_from_classifier_table(struct spp_config_area *config)
 			return -1;
 		}
 
-		/* CORE情報側にもMACアドレスの情報設定 */
-		/* MACアドレスは送信側のみに影響する為、送信側のみ設定 */
+    /* Set mac address from the table for destination tx, not need for rx */
 		patch_info->mac_addr = mac_table->mac_addr;
 		strcpy(patch_info->mac_addr_str, mac_table->mac_addr_str);
 		if (unlikely(patch_info->tx_core != NULL)) {
@@ -571,8 +584,10 @@ set_from_classifier_table(struct spp_config_area *config)
 	return 0;
 }
 
-/*
- * NIC用の情報設定
+/**
+ * Setup patch info of port on host
+ *
+ * TODO(yasufum) refactor, change if to iface.
  */
 static int
 set_nic_interface(struct spp_config_area *config __attribute__ ((unused)))
@@ -587,15 +602,14 @@ set_nic_interface(struct spp_config_area *config __attribute__ ((unused)))
 	struct patch_info *patch_info = NULL;
 	for (nic_cnt = 0; nic_cnt < RTE_MAX_ETHPORTS; nic_cnt++) {
 		patch_info = &g_if_info.nic_patchs[nic_cnt];
-		/* Set DPDK port */
 		patch_info->dpdk_port = nic_cnt;
 
+    /* TODO(yasufum) confirm why it is needed */
 		if (patch_info->use_flg == 0) {
 			/* Not Used */
 			continue;
 		}
 
-		/* CORE情報側にもDPDKポート番号の情報設定 */
 		if (patch_info->rx_core != NULL) {
 			patch_info->rx_core->dpdk_port = nic_cnt;
 		}
@@ -603,7 +617,6 @@ set_nic_interface(struct spp_config_area *config __attribute__ ((unused)))
 			patch_info->tx_core->dpdk_port = nic_cnt;
 		}
 
-		/* NICの設定数カウント */
 		nic_num++;
 	}
 
@@ -612,17 +625,18 @@ set_nic_interface(struct spp_config_area *config __attribute__ ((unused)))
 				nic_num, g_if_info.num_nic);
 		return -1;
 	}
-	
+
 	return 0;
 }
 
-/*
- * VHOST用の情報設定
+/**
+ * Setup vhost interfaces from config
+ *
+ * TODO(yasufum) refactor, change if to iface.
  */
 static int
 set_vhost_interface(struct spp_config_area *config)
 {
-	/* VHOST Setting */
 	int vhost_cnt, vhost_num = 0;
 	g_if_info.num_vhost = config->proc.num_vhost;
 	struct patch_info *patch_info = NULL;
@@ -633,7 +647,6 @@ set_vhost_interface(struct spp_config_area *config)
 			continue;
 		}
 
-		/* Set DPDK port */
 		int dpdk_port = add_vhost_pmd(vhost_cnt, g_startup_param.vhost_client);
 		if (unlikely(dpdk_port < 0)) {
 			RTE_LOG(ERR, APP, "VHOST add failed. (no = %d)\n",
@@ -642,7 +655,6 @@ set_vhost_interface(struct spp_config_area *config)
 		}
 		patch_info->dpdk_port = dpdk_port;
 
-		/* CORE情報側にもDPDKポート番号の情報設定 */
 		if (patch_info->rx_core != NULL) {
 			patch_info->rx_core->dpdk_port = dpdk_port;
 		}
@@ -659,24 +671,26 @@ set_vhost_interface(struct spp_config_area *config)
 	return 0;
 }
 
-/*
- * RING用の情報設定
+/**
+ * Setup ring interfaces from config
+ *
+ * TODO(yasufum) refactor, change if to iface.
  */
 static int
 set_ring_interface(struct spp_config_area *config)
 {
-	/* RING Setting */
 	int ring_cnt, ring_num = 0;
 	g_if_info.num_ring = config->proc.num_ring;
 	struct patch_info *patch_info = NULL;
 	for (ring_cnt = 0; ring_cnt < RTE_MAX_ETHPORTS; ring_cnt++) {
 		patch_info = &g_if_info.ring_patchs[ring_cnt];
+
+    /* TODO(yasufum) confirm why it is needed */
 		if (patch_info->use_flg == 0) {
 			/* Not Used */
 			continue;
 		}
 
-		/* Set DPDK port */
 		int dpdk_port = add_ring_pmd(ring_cnt);
 		if (unlikely(dpdk_port < 0)) {
 			RTE_LOG(ERR, APP, "RING add failed. (no = %d)\n",
@@ -685,7 +699,6 @@ set_ring_interface(struct spp_config_area *config)
 		}
 		patch_info->dpdk_port = dpdk_port;
 
-		/* CORE情報側にもDPDKポート番号の情報設定 */
 		if (patch_info->rx_core != NULL) {
 			patch_info->rx_core->dpdk_port = dpdk_port;
 		}
@@ -702,60 +715,61 @@ set_ring_interface(struct spp_config_area *config)
 	return 0;
 }
 
-/*
- * 管理データ初期設定
+/**
+ * Setup management info for spp_vf
+ *
+ * TODO(yasufum) refactor, change if to iface.
+ * TODO(yasufum) refactor, change function name from manage to mng or management
  */
 static int
 init_manage_data(struct spp_config_area *config)
 {
-	/* Initialize */
+	/* Initialize interface and core infomation */
 	init_if_info();
 	init_core_info();
 
-	/* Set config data */
+  /* Load config for resource assingment and network configuration */
 	int ret_proc = set_form_proc_info(config);
 	if (unlikely(ret_proc != 0)) {
-		/* 関数内でログ出力済みなので、省略 */
 		return -1;
 	}
 	int ret_classifier = set_from_classifier_table(config);
 	if (unlikely(ret_classifier != 0)) {
-		/* 関数内でログ出力済みなので、省略 */
 		return -1;
 	}
 
-	/* Set interface data */
 	int ret_nic = set_nic_interface(config);
 	if (unlikely(ret_nic != 0)) {
-		/* 関数内でログ出力済みなので、省略 */
 		return -1;
 	}
 
 	int ret_vhost = set_vhost_interface(config);
 	if (unlikely(ret_vhost != 0)) {
-		/* 関数内でログ出力済みなので、省略 */
 		return -1;
 	}
 
 	int ret_ring = set_ring_interface(config);
 	if (unlikely(ret_ring != 0)) {
-		/* 関数内でログ出力済みなので、省略 */
 		return -1;
 	}
 
 	return 0;
 }
 
-#ifdef SPP_RINGLATENCYSTATS_ENABLE /* RING滞留時間 */
+#ifdef SPP_RINGLATENCYSTATS_ENABLE
+/**
+ * Print statistics of time for packet processing in ring interface
+ *
+ * TODO(yasufum) refactor, change if to iface.
+ */
 static void
 print_ring_latency_stats(void)
 {
-	/* Clear screen and move to top left */
+	/* Clear screen and move cursor to top left */
 	const char topLeft[] = { 27, '[', '1', ';', '1', 'H', '\0' };
 	const char clr[] = { 27, '[', '2', 'J', '\0' };
 	printf("%s%s", clr, topLeft);
 
-	/* Print per RING */
 	int ring_cnt, stats_cnt;
 	struct spp_ringlatencystats_ring_latency_stats stats[RTE_MAX_ETHPORTS];
 	memset(&stats, 0x00, sizeof(stats));
@@ -787,32 +801,30 @@ print_ring_latency_stats(void)
 }
 #endif /* SPP_RINGLATENCYSTATS_ENABLE */
 
-/*
- * VHOST用ソケットファイル削除
+/**
+ * Remove sock file
  */
 static void
 del_vhost_sockfile(struct patch_info *vhost_patchs)
 {
 	int cnt;
 
-	/* Do not delete for vhost client. */
+	/* Do not rmeove for if it is running in vhost-client mode. */
 	if (g_startup_param.vhost_client != 0)
 		return;
 
 	for (cnt = 0; cnt < RTE_MAX_ETHPORTS; cnt++) {
 		if (likely(vhost_patchs[cnt].use_flg == 0)) {
-			/* VHOST未使用はスキップ */
+			/* Skip removing if it is not using vhost */
 			continue;
 		}
 
-		/* 使用していたVHOSTについて削除を行う */
 		remove(get_vhost_iface_name(cnt));
 	}
 }
 
-/*
- * main
- */
+/* TODO(yasufum) refactor, change if to iface. */
+/* TODO(yasufum) change test using ut_main(), or add desccription for what and why use it */
 int
 #ifndef USE_UT_SPP_VF
 main(int argc, char *argv[])
@@ -834,25 +846,23 @@ ut_main(int argc, char *argv[])
 	signal(SIGTERM, stop_process);
 	signal(SIGINT,  stop_process);
 
-	/* set default config file path */
+	/* Setup config wiht default file path */
 	strcpy(config_file_path, SPP_CONFIG_FILE_PATH);
 
 	unsigned int main_lcore_id = 0xffffffff;
 	while(1) {
-		/* DPDK initialize */
 		int ret_dpdk = rte_eal_init(argc, argv);
 		if (unlikely(ret_dpdk < 0)) {
 			break;
 		}
 
-		/* Skip dpdk parameters */
 		argc -= ret_dpdk;
 		argv += ret_dpdk;
 
 		/* Set log level  */
 		rte_log_set_global_level(RTE_LOG_LEVEL);
 
-		/* Parse application parameters */
+		/* Parse spp_vf specific parameters */
 		int ret_parse = parse_app_args(argc, argv);
 		if (unlikely(ret_parse != 0)) {
 			break;
@@ -860,30 +870,25 @@ ut_main(int argc, char *argv[])
 
 		RTE_LOG(INFO, APP, "Load config file(%s)\n", config_file_path);
 
-		/* Load config */
 		int ret_config = spp_config_load_file(config_file_path, 0, &g_config);
 		if (unlikely(ret_config != 0)) {
 			break;
 		}
 
-		/* Get core id. */
+		/* Get lcore id of main thread to set its status after */
 		main_lcore_id = rte_lcore_id();
 
-		/* 起動パラメータとコンフィグチェック */
-		/* 各IF情報設定 */
 		int ret_manage = init_manage_data(&g_config);
 		if (unlikely(ret_manage != 0)) {
 			break;
 		}
 
-		/* 他機能部初期化 */
-		/* MAC振分初期化 */
 		int ret_classifier_mac_init = spp_classifier_mac_init();
 		if (unlikely(ret_classifier_mac_init != 0)) {
 			break;
 		}
 
-		/* コマンド機能部初期化 */
+    /* Setup connection for accepting commands from controller */
 		int ret_command_init = spp_command_proc_init(
 				g_startup_param.server_ip,
 				g_startup_param.server_port);
@@ -891,7 +896,7 @@ ut_main(int argc, char *argv[])
 			break;
 		}
 
-#ifdef SPP_RINGLATENCYSTATS_ENABLE /* RING滞留時間 */
+#ifdef SPP_RINGLATENCYSTATS_ENABLE
 		int ret_ringlatency = spp_ringlatencystats_init(
 				SPP_RING_LATENCY_STATS_SAMPLING_INTERVAL, g_if_info.num_ring);
 		if (unlikely(ret_ringlatency != 0)) {
@@ -899,7 +904,7 @@ ut_main(int argc, char *argv[])
 		}
 #endif /* SPP_RINGLATENCYSTATS_ENABLE */
 
-		/* Start  thread */
+		/* Start worker threads of classifier and forwarder */
 		unsigned int lcore_id = 0;
 		RTE_LCORE_FOREACH_SLAVE(lcore_id) {
 			if (g_core_info[lcore_id].type == SPP_CONFIG_CLASSIFIER_MAC) {
@@ -913,50 +918,48 @@ ut_main(int argc, char *argv[])
 			}
 		}
 
-		/* スレッド状態確認 */
+    /* Set the status of main thread to idle */
 		g_core_info[main_lcore_id].status = SPP_CORE_IDLE;
 		int ret_wait = check_core_status_wait(SPP_CORE_IDLE);
 		if (unlikely(ret_wait != 0)) {
 			break;
 		}
 
-		/* Start forward */
+		/* Start forwarding */
 		set_core_status(SPP_CORE_FORWARD);
 		RTE_LOG(INFO, APP, "My ID %d start handling message\n", 0);
 		RTE_LOG(INFO, APP, "[Press Ctrl-C to quit ...]\n");
 
-		/* loop */
+		/* Enter loop for accepting commands */
 		int ret_do = 0;
 #ifndef USE_UT_SPP_VF
 		while(likely(g_core_info[main_lcore_id].status != SPP_CORE_STOP_REQUEST)) {
 #else
 		{
 #endif
-			/* コマンド受付 */
+      /* Receive command */
 			ret_do = spp_command_proc_do();
 			if (unlikely(ret_do != 0)) {
 				break;
 			}
 
-			/* CPUを占有しない様に1秒スリープ */
 			sleep(1);
 
-#ifdef SPP_RINGLATENCYSTATS_ENABLE /* RING滞留時間 */
+#ifdef SPP_RINGLATENCYSTATS_ENABLE
 			print_ring_latency_stats();
 #endif /* SPP_RINGLATENCYSTATS_ENABLE */
 		}
 
-		/* エラー終了 */
+    /* TODO(yasufum) confirm, add why this check is needed because it is same the case of "ret = 0", or remove */
 		if (unlikely(ret_do != 0)) {
 			break;
 		}
 
-		/* 正常終了 */
 		ret = 0;
 		break;
 	}
 
-	/* exit */
+	/* Finalize to exit */
 	if (main_lcore_id == rte_lcore_id())
 	{
 		g_core_info[main_lcore_id].status = SPP_CORE_STOP;
@@ -965,29 +968,29 @@ ut_main(int argc, char *argv[])
 			RTE_LOG(ERR, APP, "Core did not stop.\n");
 		}
 
-		/* 使用していたVHOSTのソケットファイルを削除 */
+		/* Remove vhost sock file if it is not running in vhost-client mode */
 		del_vhost_sockfile(g_if_info.vhost_patchs);
 	}
 
-	/* 他機能部終了処理 */
-#ifdef SPP_RINGLATENCYSTATS_ENABLE /* RING滞留時間 */
+#ifdef SPP_RINGLATENCYSTATS_ENABLE
 	spp_ringlatencystats_uninit();
 #endif /* SPP_RINGLATENCYSTATS_ENABLE */
+
 	RTE_LOG(INFO, APP, "spp_vf exit.\n");
 	return ret;
 }
 
-/*
- * Get client ID
- */
 int
 spp_get_client_id(void)
 {
 	return g_startup_param.client_id;
 }
 
-/*
- * Check the MAC address used on the interface
+/**
+ * Check mac address used on the interface
+ *
+ * TODO(yasufum) refactor, change if to iface.
+ * TODO(yasufum) confirm, add the reason why this check is needed
  */
 static int
 check_mac_used_interface(uint64_t mac_addr, enum port_type *if_type, int *if_no)
@@ -1013,9 +1016,6 @@ check_mac_used_interface(uint64_t mac_addr, enum port_type *if_type, int *if_no)
 	return -1;
 }
 
-/*
- * Update Classifier_table
- */
 int
 spp_update_classifier_table(
 		enum spp_classifier_type type,
@@ -1103,18 +1103,16 @@ spp_update_classifier_table(
 		}
 	}
 
-	/* 更新コマンドで設定した場合、コア毎に変更有無を保持 */
+  /* TODO(yasufum) add desc how it is used and why changed core is kept */
 	g_change_core[patch_info->tx_core_no] = 1;
 	return SPP_RET_OK;
 }
 
-/*
- * Flush SPP component
- */
+/* Flush command to execute it */
 int
 spp_flush(void)
 {
-	int core_cnt = 0;
+	int core_cnt = 0;  /* increment core id */
 	int ret_classifier = 0;
 	struct spp_core_info *core_info = NULL;
 
@@ -1132,15 +1130,14 @@ spp_flush(void)
 		}
 	}
 
-	/* 更新完了により変更したコアをクリア */
+	/* Finally, zero-clear g_change_core */
 	memset(g_change_core, 0x00, sizeof(g_change_core));
 	return SPP_RET_OK;
 }
 
-/*
- * Iterate Classifier_table
- */
-int spp_iterate_classifier_table(struct spp_iterate_classifier_table_params *params)
+int
+spp_iterate_classifier_table(
+		struct spp_iterate_classifier_table_params *params)
 {
 	int ret;
 
