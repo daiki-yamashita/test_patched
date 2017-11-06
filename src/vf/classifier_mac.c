@@ -61,6 +61,8 @@ static const size_t HASH_TABLE_NAME_BUF_SZ =
 static const size_t ETHER_ADDR_STR_BUF_SZ =
 		ETHER_ADDR_LEN * 2 + (ETHER_ADDR_LEN - 1) + 1;
 
+/* TODO(yasufum) add explanation of data structure of classifier and mng info */
+
 /* classified data (destination port, target packets, etc) */
 struct classified_data {
 	enum port_type  if_type;
@@ -90,10 +92,12 @@ struct classifier_mac_mng_info {
 /* classifier information per lcore */
 static struct classifier_mac_mng_info g_classifier_mng_info[RTE_MAX_LCORE];
 
-/* hash table count. use to make hash table name.
-	[reason for value]
-		it is incremented at the time of use, 
-		but since we want to start at 0. */
+/**
+ * Hash table count used for making a name of hash table
+ *
+ * This function is required because it is incremented at the time of use,
+ * but since we want to start at 0.
+ */
 static rte_atomic16_t g_hash_table_count = RTE_ATOMIC16_INIT(0xff);
 
 static inline int
