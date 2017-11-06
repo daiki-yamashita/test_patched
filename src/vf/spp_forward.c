@@ -4,17 +4,13 @@
 
 #define RTE_LOGTYPE_FORWARD RTE_LOGTYPE_USER1
 
-/*
- * 送受信ポートの経路情報
- */
+/* A set of port info of rx and tx */
 struct rxtx {
 	struct spp_core_port_info rx;
 	struct spp_core_port_info tx;
 };
 
-/*
- * 使用するIF情報を移し替える
- */
+/* Set destination port as source */
 static void
 set_use_interface(struct spp_core_port_info *dst,
 		struct spp_core_port_info *src)
@@ -24,8 +20,11 @@ set_use_interface(struct spp_core_port_info *dst,
 	dst->dpdk_port = src->dpdk_port;
 }
 
-/*
- * Merge/Forward
+/**
+ * Forwarding packets as forwarder or merger
+ *
+ * Behavior of forwarding is defined as core_info->type which is given
+ * as an argument of void and typecasted to spp_config_info.
  */
 int
 spp_forward(void *arg)
@@ -35,23 +34,21 @@ spp_forward(void *arg)
 	int if_cnt, rxtx_num = 0;
 	struct rxtx patch[RTE_MAX_ETHPORTS];
 
-	/* RX/TX Info setting */
+  /* Decide the destination of forwarding */
 	rxtx_num = core_info->num_rx_port;
 	for (if_cnt = 0; if_cnt < rxtx_num; if_cnt++) {
 		set_use_interface(&patch[if_cnt].rx,
 				&core_info->rx_ports[if_cnt]);
+    /* Forwarding type is supposed to forwarder or merger */
 		if (core_info->type == SPP_CONFIG_FORWARD) {
-			/* FORWARD */
 			set_use_interface(&patch[if_cnt].tx,
 					&core_info->tx_ports[if_cnt]);
 		} else {
-			/* MERGE */
 			set_use_interface(&patch[if_cnt].tx,
 					&core_info->tx_ports[0]);
 		}
 	}
 
-	/* Thread IDLE */
 	core_info->status = SPP_CORE_IDLE;
 	RTE_LOG(INFO, FORWARD, "Core[%d] Start. (type = %d)\n", lcore_id,
 			core_info->type);
@@ -67,29 +64,27 @@ spp_forward(void *arg)
 				rx = &patch[cnt].rx;
 				tx = &patch[cnt].tx;
 
-				/* Packet receive */
+				/* Receive packets */
 				nb_rx = rte_eth_rx_burst(rx->dpdk_port, 0, bufs, MAX_PKT_BURST);
 				if (unlikely(nb_rx == 0)) {
 					continue;
 				}
 
-#ifdef SPP_RINGLATENCYSTATS_ENABLE /* RING滞留時間 */
+#ifdef SPP_RINGLATENCYSTATS_ENABLE
 				if (rx->if_type == RING) {
-					/* Receive port is RING */
 					spp_ringlatencystats_calculate_latency(rx->if_no,
 							bufs, nb_rx);
 				}
 				if (tx->if_type == RING) {
-					/* Send port is RING */
 					spp_ringlatencystats_add_time_stamp(tx->if_no,
 							bufs, nb_rx);
 				}
 #endif /* SPP_RINGLATENCYSTATS_ENABLE */
 
-				/* Send packet */
+				/* Send packets */
 				nb_tx = rte_eth_tx_burst(tx->dpdk_port, 0, bufs, nb_rx);
 
-				/* Free any unsent packets. */
+				/* Discard remained packets to release mbuf */
 				if (unlikely(nb_tx < nb_rx)) {
 					for (buf = nb_tx; buf < nb_rx; buf++) {
 						rte_pktmbuf_free(bufs[buf]);
@@ -99,7 +94,6 @@ spp_forward(void *arg)
 		}
 	}
 
-	/* Thread STOP */
 	RTE_LOG(INFO, FORWARD, "Core[%d] End. (type = %d)\n", lcore_id,
 			core_info->type);
 	core_info->status = SPP_CORE_STOP;
