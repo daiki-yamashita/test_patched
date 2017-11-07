@@ -27,10 +27,7 @@ For example, resource ID of physical NIC of ID 0 is described as `phy:0`.
 ## Config Format
 
 Config files is described in JSON format.
-It consists of `vfs` and `classifier_table`.
-`vfs` defines each of spp_vf attributes and
-`classifier_table` defines MAC address and correnpond port for
-determining destination.
+Config file consists of `vfs` and defines the spp_vf attribute.
 
 ### Attributes in Config
 
@@ -42,14 +39,7 @@ determining destination.
       * core: Core ID forwarder running on.
       * type: Forwarder type (`forward`, `classifier_mac`, or `merger`).
       * rx_port: Resource ID(s) of rx port.
-      * tx_port: Resource ID of tx port. If 1:N, which means the dest is `classifier_mac`,
-                 directly described as `classifier_mac_table`.
-
-  * classifier_table
-    * name: Table name for classifier_mac, It MUST be "classifier_mac_table" in current implementation
-    * table: Set of MAC address and port for destination
-      * mac: MAC address
-      * port: Resource ID of port
+      * tx_port: Resource ID(s) of tx port.
 
 ## Sample Config
 
@@ -73,7 +63,7 @@ Here is default config `spp.json` and network diagram of it.
           "core": 3,
           "type": "classifier_mac",
           "rx_port": "ring:8",        // Rx port, It is not a list because type is classifier_mac
-          "tx_port_table": "classifier_mac_table"	// If type is classifier_mac, tx is classifier_mac_table
+          "tx_port": ["ring:0", "ring:1", "ring:4", "ring:5"]
         },
 
         {
@@ -139,28 +129,7 @@ Here is default config `spp.json` and network diagram of it.
         }
       ]
     }
-  ],
-  "classifier_table": {
-    "name":"classifier_mac_table",
-    "table": [
-      {
-        "mac":"52:54:00:12:34:56",
-        "port":"ring:0"
-      },
-      {
-        "mac":"52:54:00:12:34:57",
-        "port":"ring:4"
-      },
-      {
-        "mac":"52:54:00:12:34:58",
-        "port":"ring:1"
-      },
-      {
-        "mac":"52:54:00:12:34:59",
-        "port":"ring:5"
-      }
-    ]
-  }
+  ]
 }
 ```
 
