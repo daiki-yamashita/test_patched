@@ -96,4 +96,5 @@ Here is default config `spp.json` and network diagram of it.
 ```
 
 Network diagram
+
 ![spp_sample_config](spp_sample_config.svg)
