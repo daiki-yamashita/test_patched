@@ -29,6 +29,11 @@ $ python ./src/spp.py -p 5555 -s 6666
 SPP primary reserves and manages resources for secondary processes.
 You have to run it before secondaries.
 
+SPP primary has two kinds of options, dpdk and spp.
+Option of dpdk is before `--`, option of spp is after `--`.
+
+Option of dpdk are refer to [dpdk documentation](http://dpdk.org/doc/guides/linux_gsg/build_sample_apps.html#running-a-sample-application).
+
 Options of spp primary are
   * -p : port mask
   * -n : number of rings
@@ -45,6 +50,14 @@ $ sudo ./src/primary/x86_64-native-linuxapp-gcc/spp_primary \
 ### SPP Secondary
 
 In `spp_vf`, spp secondary processes are launched by single command.
+
+`spp_vf` has two kinds of options as well as spp primary.
+
+Option of dpdk are refer to [dpdk documentation](http://dpdk.org/doc/guides/linux_gsg/build_sample_apps.html#running-a-sample-application).
+
+Options of `spp_vf` are
+  * TODO
+
 Core assingment and network configuration are defined
 in JSON formatted config file.
 If you run `spp_vf` without giving config file, it refers default
