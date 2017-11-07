@@ -107,11 +107,6 @@ Configurations for spp-vm2 is same as spp-vm1.
   $ sudo ethtool -K ens5 tx off
   ```
 
-Check the configuration by trying ssh from remote machine that
-connection is accepted but discarded in spp secondary.
-If you do ssh for VM1, you find a messages from spp secondary for
-discarding packets.
-
 ## Test Application
 
 ### Register MAC address to Classifier
