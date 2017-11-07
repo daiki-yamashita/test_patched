@@ -188,20 +188,38 @@ Now, you can login VMs.
   $ ssh sppuser@192.168.150.32
   ```
 
-If you unregister the addresses, send request as following.
+## End Application
+
+Describe the procedure to end the application.
+
+### Remove MAC address from Classifier
+
+It is possible to remove the MAC address set by inputting the following
+command from `spp_vf.py` which was started with `Setup SPP`.
+The flush command is required to reflect the setting.
 
   ```sh
-  {
-    "commands": [
-      {
-        "command": "classifier_table",
-        "type": "mac",
-        "value": "52:54:00:12:34:58",
-        "port": "unuse"
-      },
-      {
-        "command": "flush"
-      }
-    ]
-  }
+  spp > classifier_table mac 52:54:00:12:34:56 unuse
+  spp > classifier_table mac 52:54:00:12:34:58 unuse
+  spp > flush
+  ```
+
+### Teardown SPP
+
+Tear down SPP in the reverse order of Setup.
+To stop other than spp_vf.py, press Ctrl + C on the launched screen.
+spp_vf.py can be stopped by the bye command.
+
+  ```sh
+  # stop secondary 2
+  Ctrl + C
+
+  # stop secondary 1
+  Ctrl + C
+
+  # stop primary
+  Ctrl + C
+
+  # stop controller
+  spp > bye
   ```
