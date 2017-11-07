@@ -17,12 +17,12 @@ There are three types of forwarder for 1:1, 1:N and N:1.
 
 There are three port types.
 
-  * nic: Physical NIC
+  * phy: Physical NIC
   * vhost: Vhost PMD for VMs
   * ring: Ring PMD for spp components
 
 Each of ports is identified as resource ID with port type and resource ID.
-For example, resource ID of physical NIC of ID 0 is described as `nic0`.
+For example, resource ID of physical NIC of ID 0 is described as `phy:0`.
 
 ## Config Format
 
@@ -66,76 +66,76 @@ Here is default config `spp.json` and network diagram of it.
         {
           "core": 2,   // Core ID
           "type": "merge",   // Forwarder type
-          "rx_port": ["nic0", "nic1"],  // Rx port, It MUST be a list for merge type
-          "tx_port": "ring8"            // Tx port
+          "rx_port": ["phy:0", "phy:1"],  // Rx port, It MUST be a list for merge type
+          "tx_port": "ring:8"            // Tx port
         },
         {
           "core": 3,
           "type": "classifier_mac",
-          "rx_port": "ring8",        // Rx port, It is not a list because type is classifier_mac
+          "rx_port": "ring:8",        // Rx port, It is not a list because type is classifier_mac
           "tx_port_table": "classifier_mac_table"	// If type is classifier_mac, tx is classifier_mac_table
         },
 
         {
           "core": 4,
           "type": "forward",
-          "rx_port": "ring0",
-          "tx_port": "vhost0"
+          "rx_port": "ring:0",
+          "tx_port": "vhost:0"
         },
         {
           "core": 5,
           "type": "forward",
-          "rx_port": "ring1",
-          "tx_port": "vhost2"
+          "rx_port": "ring:1",
+          "tx_port": "vhost:2"
         },
         {
           "core": 6,
           "type": "forward",
-          "rx_port": "vhost0",
-          "tx_port": "ring2"
+          "rx_port": "vhost:0",
+          "tx_port": "ring:2"
         },
         {
           "core": 7,
           "type": "forward",
-          "rx_port": "vhost2",
-          "tx_port": "ring3"
+          "rx_port": "vhost:2",
+          "tx_port": "ring:3"
         },
         {
           "core": 8,
           "type": "merge",
-          "rx_port": ["ring2", "ring3"],
-          "tx_port": "nic0"
+          "rx_port": ["ring:2", "ring:3"],
+          "tx_port": "phy:0"
         },
 
         {
           "core": 9,
           "type": "forward",
-          "rx_port": "ring4",
-          "tx_port": "vhost1"
+          "rx_port": "ring:4",
+          "tx_port": "vhost:1"
         },
         {
           "core": 10,
           "type": "forward",
-          "rx_port": "ring5",
-          "tx_port": "vhost3"
+          "rx_port": "ring:5",
+          "tx_port": "vhost:3"
         },
         {
           "core": 11,
           "type": "forward",
-          "rx_port": "vhost1",
-          "tx_port": "ring6"
+          "rx_port": "vhost:1",
+          "tx_port": "ring:6"
         },
         {
           "core": 12,
           "type": "forward",
-          "rx_port": "vhost3",
-          "tx_port": "ring7"
+          "rx_port": "vhost:3",
+          "tx_port": "ring:7"
         },
         {
           "core": 13,
           "type": "merge",
-          "rx_port": ["ring6", "ring7"],
-          "tx_port": "nic1"
+          "rx_port": ["ring:6", "ring:7"],
+          "tx_port": "phy:1"
         }
       ]
     }
@@ -145,19 +145,19 @@ Here is default config `spp.json` and network diagram of it.
     "table": [
       {
         "mac":"52:54:00:12:34:56",
-        "port":"ring0"
+        "port":"ring:0"
       },
       {
         "mac":"52:54:00:12:34:57",
-        "port":"ring4"
+        "port":"ring:4"
       },
       {
         "mac":"52:54:00:12:34:58",
-        "port":"ring1"
+        "port":"ring:1"
       },
       {
         "mac":"52:54:00:12:34:59",
-        "port":"ring5"
+        "port":"ring:5"
       }
     ]
   }

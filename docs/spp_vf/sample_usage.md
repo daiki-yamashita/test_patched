@@ -24,7 +24,7 @@ First, launch spp controller and primary process.
   /path/to/Soft-Patch-Panel
 
   # SPP controller
-  $ python ./src/spp.py -p 5555 -s 6666
+  $ python ./src/spp_vf.py -p 5555 -s 6666
 
   # SPP primary
   $ sudo ./src/primary/x86_64-native-linuxapp-gcc/spp_primary \
@@ -34,18 +34,9 @@ First, launch spp controller and primary process.
   -p 0x03 -n 8 -s 127.0.0.1:5555
   ```
 
-After primary process is launched, run nc command for each of
-seconrdary processes and itselves.
-In this sample, commands for secondary are sent from nc because
-`spp.py` does not support commands for spp_vf.
-nc is a network utility and it can open TCP connections, send UDP
-packets, listen on arbitrary TCP and UDP ports, do port scanning,
-and deal with both IPv4 and IPv6.
+launch secondary process after launch primary process.
 
   ```sh
-  # run nc for secondary 1 with port 11111
-  $ while true; do nc -l 11111; done
-
   # start secondary 1
   $ sudo ./src/vf/x86_64-native-linuxapp-gcc/spp_vf \
   -c 0x00fd -n 4 --proc-type=secondary \
@@ -53,9 +44,6 @@ and deal with both IPv4 and IPv6.
   --process-id 1 \
   --config /path/to/spp_vf1_without_cmtab.json \
   -s 127.0.0.1:11111
-
-  # run nc for secondary 2 with port 11112
-  $ while true; do nc -l 11112; done
 
   # start secondary 2
   $ sudo ./src/vf/x86_64-native-linuxapp-gcc/spp_vf \
@@ -126,48 +114,20 @@ discarding packets.
 
 ## Test Application
 
-TODO(yasufum) json-based steps will be deprecated.
-
 ### Register MAC address to Classifier
 
 Register MAC addresses to classifier.
 
   ```sh
-  {
-    "commands": [
-      {
-        "command": "classifier_table",
-        "type": "mac",
-        "value": "52:54:00:12:34:56",
-        "port": "ring0"
-      },
-      {
-        "command": "classifier_table",
-        "type": "mac",
-        "value": "52:54:00:12:34:58",
-        "port": "ring1"
-      },
-      {
-        "command": "flush"
-      }
-    ]
-  }
+  spp > classifier_table mac 52:54:00:12:34:56 ring:0
+  spp > classifier_table mac 52:54:00:12:34:58 ring:1
+  spp > flush
   ```
 
   ```sh
-  {
-    "commands": [
-      {
-        "command": "classifier_table",
-        "type": "mac",
-        "value": "52:54:00:12:34:57",
-        "port": "ring4"
-      },
-      {
-                    "command": "flush"
-      }
-    ]
-  }
+  spp > classifier_table mac 52:54:00:12:34:57 ring:4
+  spp > classifier_table mac 52:54:00:12:34:59 ring:5
+  spp > flush
   ```
 
 ### Login to VMs
@@ -201,6 +161,10 @@ The flush command is required to reflect the setting.
   ```sh
   spp > classifier_table mac 52:54:00:12:34:56 unuse
   spp > classifier_table mac 52:54:00:12:34:58 unuse
+
+  spp > classifier_table mac 52:54:00:12:34:57 unuse
+  spp > classifier_table mac 52:54:00:12:34:59 unuse
+
   spp > flush
   ```
 

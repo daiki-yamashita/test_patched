@@ -21,7 +21,7 @@ Before launching spp, you need to setup described as [setup guide](setup_guide.m
 First, run SPP Controller with port numbers for spp primary and secondary.
 
 ```sh
-$ python ./src/spp.py -p 5555 -s 6666
+$ python ./src/spp_vf.py -p 5555 -s 6666
 ```
 
 ### SPP Primary
