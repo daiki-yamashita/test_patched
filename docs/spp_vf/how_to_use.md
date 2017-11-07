@@ -64,7 +64,7 @@ Options of `spp_vf` are
 Core assingment and network configuration are defined
 in JSON formatted config file.
 If you run `spp_vf` without giving config file, it refers default
-config file (test/spp_config/spp_config/vf.json).
+config file (/usr/local/etc/spp/spp.json).
 
 ```sh
 $ sudo ./src/vf/x86_64-native-linuxapp-gcc/spp_vf \
@@ -97,7 +97,7 @@ $ sudo ./src/vf/x86_64-native-linuxapp-gcc/spp_vf \
 -s 127.0.0.1:6666 --vhost-client
 ```
 
-### SPP VM
+### VM
 
 Launch VMs with `virsh` command.
 
@@ -108,9 +108,9 @@ $ virsh start [VM]
 ### Additional Network Configurations
 
 To enable processes running on the VM to communicate through spp,
-it is required additional network configurations on host and guest VMss.
+it is required additional network configurations on host and guest VMs.
 
-#### Host1
+#### Guest VMs 
 
 ```sh
 # Interface for vhost

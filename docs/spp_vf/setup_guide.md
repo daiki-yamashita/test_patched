@@ -73,7 +73,7 @@ Finally, you unmount default hugepage.
 $ sudo unmount /dev/hugepages
 ```
 
-#### Install jasson
+#### Install jansson
 
 Network configuration is defined in JSON and `spp_vf` reads config from
 the file while launching.

@@ -32,7 +32,7 @@ Config file consists of `vfs` and defines the spp_vf attribute.
 ### Attributes in Config
 
   * vfs
-    * name: Name of spp_vf component.
+    * name: Name of the configuration. Please set user as desired.
     * num_vhost: Number of vhosts spp_vf use.
     * num_ring: Number of rings spp_vf use.
     * functions: List of forwarders and its attributes (function means a forwarder).
