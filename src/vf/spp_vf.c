@@ -384,9 +384,9 @@ parse_app_args(int argc, char *argv[])
  * Return patch info of given type and num of interface
  *
  * It returns NULL value if given type is invalid.
+ *
  * TODO(yasufum) refactor name of func to be more understandable (area?)
  * TODO(yasufum) refactor, change if to iface.
- * TODO(yasufum) confirm why it returns not -1 but NULL.
  */
 static struct patch_info *
 get_if_area(enum port_type if_type, int if_no)
@@ -471,8 +471,9 @@ set_form_proc_info(struct spp_config_area *config)
 			continue;
 		}
 
-    /* Forwardをまとめる事は可、他種別は不可 */
-    /* TODO(yasufum) confirm what is the purpose and meaning */
+    /* Check if type of core_info is SPP_CONFIG_FORWARD because this
+     * this type is only available for several settings.
+     */
     if ((core_info->type != SPP_CONFIG_UNUSE) &&
         ((core_info->type != SPP_CONFIG_FORWARD) ||
          (core_func->type != SPP_CONFIG_FORWARD))) {
@@ -509,8 +510,7 @@ set_form_proc_info(struct spp_config_area *config)
 				return -1;
 			}
 
-			/* IF情報からCORE情報を変更する場合用に設定 */
-      /* TODO(yasufum) confirm the meaning of this comment */
+			/* Hold core info is to be referred for updating this information */
 			patch_info->rx_core_no = core_func->core_no;
 			patch_info->rx_core    = &core_info->rx_ports[rx_start + rx_cnt];
 		}
@@ -534,8 +534,7 @@ set_form_proc_info(struct spp_config_area *config)
 				return -1;
 			}
 
-			/* IF情報からCORE情報を変更する場合用に設定 */
-      /* TODO(yasufum) confirm the meaning of this comment */
+			/* Hold core info is to be referred for updating this information */
 			patch_info->tx_core_no = core_func->core_no;
 			patch_info->tx_core    = &core_info->tx_ports[tx_start + tx_cnt];
 		}
@@ -548,7 +547,6 @@ set_form_proc_info(struct spp_config_area *config)
  * Load mac table entries from config and setup patches
  *
  * TODO(yasufum) refactor, change if to iface.
- * TODO(yasufum) confirm if additional description for the structure of mac table is needed.
  */
 static int
 set_from_classifier_table(struct spp_config_area *config)
@@ -604,9 +602,8 @@ set_nic_interface(struct spp_config_area *config __attribute__ ((unused)))
 		patch_info = &g_if_info.nic_patchs[nic_cnt];
 		patch_info->dpdk_port = nic_cnt;
 
-    /* TODO(yasufum) confirm why it is needed */
+    /* Skip for no used nic */
 		if (patch_info->use_flg == 0) {
-			/* Not Used */
 			continue;
 		}
 
@@ -685,9 +682,8 @@ set_ring_interface(struct spp_config_area *config)
 	for (ring_cnt = 0; ring_cnt < RTE_MAX_ETHPORTS; ring_cnt++) {
 		patch_info = &g_if_info.ring_patchs[ring_cnt];
 
-    /* TODO(yasufum) confirm why it is needed */
 		if (patch_info->use_flg == 0) {
-			/* Not Used */
+      /* Skip for no used nic */
 			continue;
 		}
 
@@ -825,6 +821,7 @@ del_vhost_sockfile(struct patch_info *vhost_patchs)
 
 /* TODO(yasufum) refactor, change if to iface. */
 /* TODO(yasufum) change test using ut_main(), or add desccription for what and why use it */
+/* TODO(yasufum) change to return -1 explicity if error is occured. */
 int
 #ifndef USE_UT_SPP_VF
 main(int argc, char *argv[])
@@ -950,7 +947,6 @@ ut_main(int argc, char *argv[])
 #endif /* SPP_RINGLATENCYSTATS_ENABLE */
 		}
 
-    /* TODO(yasufum) confirm, add why this check is needed because it is same the case of "ret = 0", or remove */
 		if (unlikely(ret_do != 0)) {
 			break;
 		}
@@ -987,10 +983,9 @@ spp_get_client_id(void)
 }
 
 /**
- * Check mac address used on the interface
+ * Check mac address used on the interface for registering or removing
  *
  * TODO(yasufum) refactor, change if to iface.
- * TODO(yasufum) confirm, add the reason why this check is needed
  */
 static int
 check_mac_used_interface(uint64_t mac_addr, enum port_type *if_type, int *if_no)
