@@ -71,7 +71,7 @@ set `-oStrictHostKeyChecking=no` option for ssh.
   $ ssh -oStrictHostKeyChecking=no sppuser@192.168.122.31
   ```
 
-Up interfaces for vhost and register them to arp table inside spp-vm1.
+Up interfaces for vhost inside spp-vm1.
 In addition, you have to disable TCP offload function, or ssh is faled
 after configuration is done.
 
@@ -79,10 +79,6 @@ after configuration is done.
   # up interfaces
   $ sudo ifconfig ens4 inet 192.168.140.21 netmask 255.255.255.0 up
   $ sudo ifconfig ens5 inet 192.168.150.22 netmask 255.255.255.0 up
-
-  # register to arp table
-  $ sudo arp -s 192.168.140.11 a0:36:9f:78:86:78 -i ens4
-  $ sudo arp -s 192.168.150.13 a0:36:9f:6c:ed:bc -i ens5
 
   # diable TCP offload
   $ sudo ethtool -K ens4 tx off
@@ -97,10 +93,6 @@ Configurations for spp-vm2 is same as spp-vm1.
   # up interfaces
   $ sudo ifconfig ens4 inet 192.168.140.31 netmask 255.255.255.0 up
   $ sudo ifconfig ens5 inet 192.168.150.32 netmask 255.255.255.0 up
-
-  # register to arp table
-  $ sudo arp -s 192.168.140.11 a0:36:9f:78:86:78 -i ens4
-  $ sudo arp -s 192.168.150.13 a0:36:9f:6c:ed:bc -i ens5
 
   # diable TCP offload
   $ sudo ethtool -K ens4 tx off

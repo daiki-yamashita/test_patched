@@ -100,9 +100,6 @@ it is required additional network configurations on host and guest VMss.
 # Interface for vhost
 $ sudo ifconfig [IF_NAME] inet [IP_ADDR] netmask [NETMASK] up
 
-# Register host2 to arp table
-$ sudo arp -s [IP_ADDR] [MAC_ADDR] -i [IF_NAME]
-
 # Disable offload for vhost interface
 $ sudo ethtool -K [IF_NAME] tx off
 ```
@@ -110,9 +107,6 @@ $ sudo ethtool -K [IF_NAME] tx off
 #### Host2
 
 ```sh
-# Register VM to arp table
-$ sudo arp -s [IP_ADDR] [MAC_ADDR] -i [IF_NAME]
-
 # Disable offload for VM interface
 $ ethtool -K [IF_NAME] tx off
 ```
