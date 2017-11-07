@@ -452,10 +452,9 @@ init_core_info(void)
  * Set properties of g_core_info from config
  *
  * TODO(yasufum) refactor, change if to iface.
- * TODO(yasufum) confirm meaning of funciton name and is typo ?
  */
 static int
-set_form_proc_info(struct spp_config_area *config)
+set_from_proc_info(struct spp_config_area *config)
 {
 	int core_cnt, rx_start, rx_cnt, tx_start, tx_cnt;
 	enum port_type if_type;
@@ -725,7 +724,7 @@ init_manage_data(struct spp_config_area *config)
 	init_core_info();
 
   /* Load config for resource assingment and network configuration */
-	int ret_proc = set_form_proc_info(config);
+	int ret_proc = set_from_proc_info(config);
 	if (unlikely(ret_proc != 0)) {
 		return -1;
 	}
