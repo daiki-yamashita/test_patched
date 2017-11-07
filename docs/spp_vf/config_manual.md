@@ -50,22 +50,21 @@ Here is default config `spp.json` and network diagram of it.
   "vfs": [
     {
       "name": "vf0",
-      "num_vhost": 4,  // Number of vhosts
-      "num_ring": 9,   // Number of rings
-      "functions":[    // Attributes of forward,merge or classifier_mac
+      "num_vhost": 2,
+      "num_ring": 4,
+      "functions":[
         {
-          "core": 2,   // Core ID
-          "type": "merge",   // Forwarder type
-          "rx_port": ["phy:0", "phy:1"],  // Rx port, It MUST be a list for merge type
-          "tx_port": "ring:8"            // Tx port
+          "core": 2,
+          "type": "classifier_mac",
+          "rx_port": "phy:0",
+          "tx_port": ["ring:0", "ring:1"]
         },
         {
           "core": 3,
-          "type": "classifier_mac",
-          "rx_port": "ring:8",        // Rx port, It is not a list because type is classifier_mac
-          "tx_port": ["ring:0", "ring:1", "ring:4", "ring:5"]
+          "type": "merge",
+          "rx_port": ["ring:2", "ring:3"],
+          "tx_port": "phy:0"
         },
-
         {
           "core": 4,
           "type": "forward",
@@ -76,7 +75,7 @@ Here is default config `spp.json` and network diagram of it.
           "core": 5,
           "type": "forward",
           "rx_port": "ring:1",
-          "tx_port": "vhost:2"
+          "tx_port": "vhost:1"
         },
         {
           "core": 6,
@@ -87,45 +86,8 @@ Here is default config `spp.json` and network diagram of it.
         {
           "core": 7,
           "type": "forward",
-          "rx_port": "vhost:2",
-          "tx_port": "ring:3"
-        },
-        {
-          "core": 8,
-          "type": "merge",
-          "rx_port": ["ring:2", "ring:3"],
-          "tx_port": "phy:0"
-        },
-
-        {
-          "core": 9,
-          "type": "forward",
-          "rx_port": "ring:4",
-          "tx_port": "vhost:1"
-        },
-        {
-          "core": 10,
-          "type": "forward",
-          "rx_port": "ring:5",
-          "tx_port": "vhost:3"
-        },
-        {
-          "core": 11,
-          "type": "forward",
           "rx_port": "vhost:1",
-          "tx_port": "ring:6"
-        },
-        {
-          "core": 12,
-          "type": "forward",
-          "rx_port": "vhost:3",
-          "tx_port": "ring:7"
-        },
-        {
-          "core": 13,
-          "type": "merge",
-          "rx_port": ["ring:6", "ring:7"],
-          "tx_port": "phy:1"
+          "tx_port": "ring:3"
         }
       ]
     }
@@ -134,50 +96,4 @@ Here is default config `spp.json` and network diagram of it.
 ```
 
 Network diagram
-[TODO] Replace it to more readable SVG img.
-
-```
-+---------+  +-----------------------------------------------------------------------------------------------+
-|  host2  |  | Host1                                                                                         |
-|         |  |              +------------------------------------------------------+  +-------------------+  |
-|         |  |              | spp_vf                                               |  |                   |  |
-| +-----+ |  | +--------+   | +---+  +----+  +---+     +----+  +---+  +----------+ |  | +----------+      |  |
-| | nic <------>  nic0  +-----> M +--> r8 +--> C +-----> r0 +--> F +-->          +------>          |      |  |
-| +-----+ |  | +----+---+   | +-^-+  +----+  +-+-+     +----+  +---+  |          | |  | |          |      |  |
-|         |  |      ^       |   |              |                      |  vhost0  | |  | |    nic   |      |  |
-|         |  |      |       |   |              |       +----+  +---+  |          | |  | |          |      |  |
-|         |  |      |       |   |       +--------------+ r2 <--+ F <--+          <------+          |      |  |
-|         |  |      |       |   |       |      |       +----+  +---+  +----------+ |  | +----------+      |  |
-|         |  |      |       |   |       |      |                                   |  |             spp vm|  |
-|         |  |      |       |   |       |      |       +----+  +---+  +----------+ |  | +----------+      |  |
-|         |  |      |       |   |       |      +-------> r4 +--+ F +-->          +------>          |      |  |
-|         |  |      |       |   |    +--v--+   |       +----+  +---+  |          | |  | |          |      |  |
-|         |  |      +----------------+  M  |   |                      |  vhost1  | |  | |    nic   |      |  |
-|         |  |              |   |    +--^--+   |       +----+  +---+  |          | |  | |          |      |  |
-|         |  |              |   |       | +------------+ r6 +--+ F <--+          <------+          |      |  |
-|         |  |              |   |       | |    |       +----+  +---+  +----------+ |  | +----------+      |  |
-|         |  |              |   |       | |    |                                   |  |                   |  |
-|         |  |              |   |       | |    |                                   |  +-------------------+  |
-|         |  |              |   |       | |    |                                   |                         |
-|         |  |              |   |       | |    |                                   |  +-------------------+  |
-|         |  |              |   |       | |    |                                   |  |                   |  |
-| +-----+ |  | +--------+   |   |       | |    |       +----+  +---+  +----------+ |  | +----------+      |  |
-| | nic <------>  nic1  +-------+       | |    +-------> r1 +--+ F +-->          +------>          |      |  |
-| +-----+ |  | +----+---+   |           | |    |       +----+  +---+  |          | |  | |          |      |  |
-|         |  |      ^       |           | |    |                      |  vhost2  | |  | |    nic   |      |  |
-|         |  |      |       |           | |    |       +----+  +---+  |          | |  | |          |      |  |
-|         |  |      |       |           +--------------+ r3 +--+ F <--+          <------+          |      |  |
-|         |  |      |       |             |    |       +----+  +---+  +----------+ |  | +----------+      |  |
-|         |  |      |       |             |    |                                   |  |             spp vm|  |
-|         |  |      |       |             |    |       +----+  +---+  +----------+ |  | +----------+      |  |
-|         |  |      |       |             |    +-------> r5 +--+ F +-->          +------>          |      |  |
-|         |  |      |       |        +----v+           +----+  +---+  |          | |  | |          |      |  |
-|         |  |      +----------------+  M  |                          |  vhost3  | |  | |    nic   |      |  |
-|         |  |              |        +--^--+           +----+  +---+  |          | |  | |          |      |  |
-|         |  |              |           +--------------+ r7 +--+ F <--+          <------+          |      |  |
-|         |  |              |                          +----+  +---+  +----------+ |  | +----------+      |  |
-|         |  |              |                                                      |  |                   |  |
-|         |  |              +------------------------------------------------------+  +-------------------+  |
-|         |  |                                                                                               |
-+---------+  +-----------------------------------------------------------------------------------------------+
-```
+![spp_sample_config](spp_sample_config.svg)
