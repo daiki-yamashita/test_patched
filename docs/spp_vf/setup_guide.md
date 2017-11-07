@@ -37,6 +37,11 @@ Change grub config for hugepages and isolcpus.
 GRUB_CMDLINE_LINUX_DEFAULT="isolcpus=2,4,6,8,10,12-18,20,22,24,26-42,44,46 hugepagesz=1G hugepages=36 default_hugepagesz=1G"
 ```
 
+For hugepages, isolcpus, refer to the dpdk documentation below.
+* [Use of Hugepages in the Linux Environment](http://dpdk.org/doc/guides/linux_gsg/sys_reqs.html#running-dpdk-applications)
+* [Using Linux Core Isolation to Reduce Context Switches](http://dpdk.org/doc/guides/linux_gsg/enable_func.html#using-linux-core-isolation-to-reduce-context-switches)
+* [Linux boot command line](http://dpdk.org/doc/guides/linux_gsg/nic_perf_intel_platform.html#linux-boot-command-line)
+
 You need to run `update-grub` and reboot to activate grub config.
 
 ```sh
