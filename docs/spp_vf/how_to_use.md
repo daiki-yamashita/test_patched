@@ -9,7 +9,7 @@ SPP_VF is a SR-IOV like network functionality for NFV.
 ## Environment
 
 * Ubuntu 16.04
-* qemu-kvm
+* qemu-kvm 2.7 or later
 * DPDK v17.05 or later
 
 ## Launch SPP
@@ -56,7 +56,10 @@ In `spp_vf`, spp secondary processes are launched by single command.
 Option of dpdk are refer to [dpdk documentation](http://dpdk.org/doc/guides/linux_gsg/build_sample_apps.html#running-a-sample-application).
 
 Options of `spp_vf` are
-  * TODO
+  * --client-id    : client id
+  * --config       : config file path
+  * -s             : Port for ip addr and spp secondary
+  * --vhost-client : vhost-user client enable setting
 
 Core assingment and network configuration are defined
 in JSON formatted config file.
@@ -65,7 +68,19 @@ config file (test/spp_config/spp_config/vf.json).
 
 ```sh
 $ sudo ./src/vf/x86_64-native-linuxapp-gcc/spp_vf \
--c 0x3ffd -n 4 --proc-type=secondary
+-c 0x3ffd -n 4 --proc-type=secondary \
+-- --client-id 1 -s 127.0.0.1:6666 --vhost-client
+```
+
+`--vhost-client` option is used when SPP is a client of vhost-user.
+By choosing not to use `--vhost-client` option,
+It may be possible to use SPP even in qemu (before 2.7 version)
+which can not be used as a vhost-user server.
+
+```sh
+$ sudo ./src/vf/x86_64-native-linuxapp-gcc/spp_vf \
+-c 0x3ffd -n 4 --proc-type=secondary \
+-- --client-id 1 -s 127.0.0.1:6666
 ```
 
 You can also indicate which of config you use explicitly with
@@ -78,7 +93,8 @@ defined in each of config files.
 ```sh
 $ sudo ./src/vf/x86_64-native-linuxapp-gcc/spp_vf \
 -c 0x3ffd -n 4 --proc-type=secondary \
--- --config /path/to/config/spp_vf1.json
+-- --client-id 1 --config /path/to/config/spp_vf1.json \
+-s 127.0.0.1:6666 --vhost-client
 ```
 
 ### SPP VM

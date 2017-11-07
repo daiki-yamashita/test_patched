@@ -3,7 +3,7 @@
 ## Environment
 
 * Ubuntu 16.04
-* qemu-kvm
+* qemu-kvm 2.7 or later
 * DPDK v17.05 or later
 
 ## Setting
@@ -205,15 +205,15 @@ $ virsh edit [VM_NAME]
 	    <qemu:arg value='node,memdev=mem'/>
 	    <qemu:arg value='-mem-prealloc'/>
 	    <qemu:arg value='-chardev'/>
-	    <qemu:arg value='socket,id=chr0,path=/tmp/sock0'/>
+	    <qemu:arg value='socket,id=chr0,path=/tmp/sock0,server'/>
 	    <qemu:arg value='-device'/>
-	    <qemu:arg value='virtio-net-pci,netdev=vhost-net0'/>
+	    <qemu:arg value='virtio-net-pci,netdev=vhost-net0,mac=52:54:00:12:34:56'/>
 	    <qemu:arg value='-netdev'/>
 	    <qemu:arg value='vhost-user,id=vhost-net0,chardev=chr0,vhostforce'/>
 	    <qemu:arg value='-chardev'/>
-	    <qemu:arg value='socket,id=chr1,path=/tmp/sock1'/>
+	    <qemu:arg value='socket,id=chr1,path=/tmp/sock1,server'/>
 	    <qemu:arg value='-device'/>
-	    <qemu:arg value='virtio-net-pci,netdev=vhost-net1'/>
+	    <qemu:arg value='virtio-net-pci,netdev=vhost-net1,mac=52:54:00:12:34:57'/>
 	    <qemu:arg value='-netdev'/>
 	    <qemu:arg value='vhost-user,id=vhost-net1,chardev=chr1,vhostforce'/>
 	  </qemu:commandline>

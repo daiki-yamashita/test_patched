@@ -41,17 +41,19 @@ launch secondary process after launch primary process.
   $ sudo ./src/vf/x86_64-native-linuxapp-gcc/spp_vf \
   -c 0x00fd -n 4 --proc-type=secondary \
   -- \
-  --process-id 1 \
+  --client-id 1 \
   --config /path/to/spp_vf1_without_cmtab.json \
-  -s 127.0.0.1:11111
+  -s 127.0.0.1:11111 \
+  --vhost-client
 
   # start secondary 2
   $ sudo ./src/vf/x86_64-native-linuxapp-gcc/spp_vf \
   -c 0x3f01 -n 4 --proc-type=secondary \
   -- \
-  --process-id 2 \
+  --client-id 2 \
   --config /path/to/spp_vf2_without_cmtab.json \
-  -s 127.0.0.1:11112
+  -s 127.0.0.1:11112 \
+  --vhost-client
   ```
 
 ### Setup network configuration for VMs
