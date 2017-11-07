@@ -74,44 +74,10 @@ Network configuration is defined in JSON and `spp_vf` reads config from
 the file while launching.
 [jasson](http://www.digip.org/jansson/) is a JSON library written in C.
 
-It is required to use `json_path` feature of `jasson` for `spp_vf`.
-It has develped under `json_path` branch and you need to checkout and compile
-it manually.
+Install the -dev package.
 
 ```sh
-$ git clone https://github.com/rogerz/jansson
-$ cd jansson
-$ sudo git checkout json_path
-Branch json_path set up to track remote branch json_path from origin. Switched to a new branch 'json_path'
-```
-
-This setup guide expects that `jasson` is placed as `/opt/jasson`.
-
-```sh
-$ sudo mkdir -p /opt/jansson
-$ sudo mv jansson /opt/jansson
-```
-
-Compile it as following.
-
-```sh
-$ cd /opt/jansson/jansson
-$ sudo autoreconf -i
-$ sudo ./configure
-$ sudo make
-$ sudo make install
-$ sudo ldconfig
-```
-
-Then, confirm that header files of jasson are generated in `/usr/local/include`.
-
-```sh
-$ ls -al /usr/local/include
-total 24
-drwxr-xr-x  2 root root 4096 Jul 28 16:45 .
-drwxr-xr-x 10 root root 4096 May 27 10:23 ..
--rw-r--r--  1 root root 1183 Jul 28 16:45 jansson_config.h
--rw-r--r--  1 root root 9499 Jul 28 16:45 jansson.h
+$ sudo apt-get install libjansson-dev
 ```
 
 #### Install DPDK
