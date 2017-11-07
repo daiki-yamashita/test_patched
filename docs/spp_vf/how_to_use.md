@@ -10,7 +10,7 @@ SPP_VF is a SR-IOV like network functionality for NFV.
 
 * Ubuntu 16.04
 * qemu-kvm
-* DPDK v17.05
+* DPDK v17.05 or later
 
 ## Launch SPP
 

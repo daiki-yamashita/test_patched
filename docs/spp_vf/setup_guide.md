@@ -4,7 +4,7 @@
 
 * Ubuntu 16.04
 * qemu-kvm
-* DPDK v17.05
+* DPDK v17.05 or later
 
 ## Setting
 
@@ -116,7 +116,7 @@ drwxr-xr-x 10 root root 4096 May 27 10:23 ..
 
 #### Install DPDK
 
-Install DPDK v17.05 in any directory. This is a simple instruction and please refer
+Install DPDK in any directory. This is a simple instruction and please refer
 [Getting Started Guide for Linux](http://dpdk.org/doc/guides/linux_gsg/index.html)
 for details.
 
@@ -124,7 +124,7 @@ for details.
 $ cd /path/to/any_dir
 $ git clone http://dpdk.org/git/dpdk
 $ cd dpdk
-$ git checkout v17.05
+$ git checkout [TAG_NAME(e.g. v17.05)]
 $ export RTE_SDK=`pwd`
 $ export RTE_TARGET=x86_64-native-linuxapp-gcc
 $ make T=x86_64-native-linuxapp-gcc install
