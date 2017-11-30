@@ -1,6 +1,8 @@
 #ifndef _COMMAND_DEC_H_
 #define _COMMAND_DEC_H_
 
+//#include "spp_vf.h"
+
 /* max number of command per request */
 #define SPP_CMD_MAX_COMMANDS 32
 
@@ -15,9 +17,6 @@
 
 /* string that specify unused */
 #define SPP_CMD_UNUSE "unuse"
-
-/* component type */
-#define spp_component_type spp_core_type
 
 /* decode error code */
 enum spp_command_decode_error_code {
@@ -36,31 +35,17 @@ enum spp_command_type {
 	SPP_CMDTYPE_FLUSH,
 	SPP_CMDTYPE_CLIENT_ID,
 	SPP_CMDTYPE_STATUS,
+	SPP_CMDTYPE_EXIT,
+	SPP_CMDTYPE_COMPONENT,
+	SPP_CMDTYPE_PORT,
 };
-
-#if 0 /* not supported yet */
-/* "add" command parameters */
-struct spp_command_add {
-	int num_port;
-	struct spp_config_port_info ports[RTE_MAX_ETHPORTS];
-};
-
-/* "component" command specific parameters */
-struct spp_command_component {
-	enum spp_component_type type;
-	unsigned int core_id;
-	int num_rx_port;
-	int num_tx_port;
-	struct spp_config_port_info rx_ports[RTE_MAX_ETHPORTS];
-	struct spp_config_port_info tx_ports[RTE_MAX_ETHPORTS];
-};
-#endif
 
 /* "classifier_table" command specific parameters */
 struct spp_command_classifier_table {
+	enum spp_command_action action;
 	enum spp_classifier_type type;
 	char value[SPP_CMD_VALUE_BUFSZ];
-	struct spp_config_port_info port;
+	struct spp_port_index port;
 };
 
 /* "flush" command specific parameters */
@@ -68,17 +53,31 @@ struct spp_command_flush {
 	/* nothing specific */
 };
 
+/* "component" command parameters */
+struct spp_command_component {
+	enum spp_command_action action;
+	char name[SPP_CMD_NAME_BUFSZ];
+	unsigned int core;
+	enum spp_component_type type;
+};
+
+/* "port" command parameters */
+struct spp_command_port {
+	enum spp_command_action action;
+	struct spp_port_index port;
+	enum spp_port_rxtx rxtx;
+	char name[SPP_CMD_NAME_BUFSZ];
+};
+
 /* command parameters */
 struct spp_command {
 	enum spp_command_type type;
 
 	union {
-#if 0 /* not supported yet */
-		struct spp_command_add add;
-		struct spp_command_component component;
-#endif
 		struct spp_command_classifier_table classifier_table;
 		struct spp_command_flush flush;
+		struct spp_command_component component;
+		struct spp_command_port port;
 	} spec;
 };
 
@@ -90,6 +89,7 @@ struct spp_command_request {
 
 	int is_requested_client_id;
 	int is_requested_status;
+	int is_requested_exit;
 };
 
 /* decode error information */

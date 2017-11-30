@@ -7,7 +7,6 @@
 #include <jansson.h>
 
 #include "spp_vf.h"
-#include "spp_config.h"
 #include "string_buffer.h"
 #include "command_conn.h"
 #include "command_dec.h"
@@ -40,6 +39,7 @@ execute_command(const struct spp_command *command)
 	case SPP_CMDTYPE_CLASSIFIER_TABLE:
 		RTE_LOG(INFO, SPP_COMMAND_PROC, "Execute classifier_table command.\n");
 		ret = spp_update_classifier_table(
+				command->spec.classifier_table.action,
 				command->spec.classifier_table.type,
 				command->spec.classifier_table.value,
 				&command->spec.classifier_table.port);
@@ -48,6 +48,25 @@ execute_command(const struct spp_command *command)
 	case SPP_CMDTYPE_FLUSH:
 		RTE_LOG(INFO, SPP_COMMAND_PROC, "Execute flush command.\n");
 		ret = spp_flush();
+		break;
+
+	case SPP_CMDTYPE_COMPONENT:
+		RTE_LOG(INFO, SPP_COMMAND_PROC, "Execute component command.\n");
+		ret = spp_update_component(
+				command->spec.component.action,
+				command->spec.component.name,
+				command->spec.component.core,
+				command->spec.component.type);
+		break;
+
+	case SPP_CMDTYPE_PORT:
+		RTE_LOG(INFO, SPP_COMMAND_PROC, "Execute port command. (act = %d)\n",
+				command->spec.port.action);
+		ret = spp_update_port(
+				command->spec.port.action,
+				&command->spec.port.port,
+				command->spec.port.rxtx,
+				command->spec.port.name);
 		break;
 
 	default:
@@ -230,12 +249,12 @@ int append_classifier_element_value(
 		void *opaque,
 		__rte_unused enum spp_classifier_type type,
 		const char *data,
-		const struct spp_config_port_info *port)
+		const struct spp_port_index *port)
 {
 	json_t *parent_obj = (json_t *)opaque;
 
 	char port_str[64];
-	spp_config_format_port_string(port_str, port->if_type, port->if_no);
+	spp_format_port_string(port_str, port->if_type, port->if_no);
 
 	json_array_append_new(parent_obj, json_pack(
 			"{ssssss}",
@@ -416,7 +435,7 @@ process_request(int *sock, const char *request_str, size_t request_str_len)
 		/* send error response */
 		send_decode_error_response(sock, &request, &decode_error);
 		RTE_LOG(DEBUG, SPP_COMMAND_PROC, "End command request processing.\n");
-		return ret;
+		return 0;
 	}
 
 	RTE_LOG(DEBUG, SPP_COMMAND_PROC, "Command request is valid. "
@@ -436,6 +455,13 @@ process_request(int *sock, const char *request_str, size_t request_str_len)
 		}
 
 		command_results[i].code = CRES_SUCCESS;
+	}
+
+	if (request.is_requested_exit) {
+		/* Terminated by process exit command.                       */
+		/* Other route is normal end because it responds to command. */
+		RTE_LOG(INFO, SPP_COMMAND_PROC, "No response with process exit command.");
+		return -1;
 	}
 
 	/* send response */
@@ -489,5 +515,5 @@ spp_command_proc_do(void)
 	ret = process_request(&sock, msgbuf, msg_ret);
 	spp_strbuf_remove_front(msgbuf, msg_ret);
 
-	return 0;
+	return ret;
 }

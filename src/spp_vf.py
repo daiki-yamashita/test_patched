@@ -60,7 +60,7 @@ def connectionthread(name, client_id, conn, m2s, s2m):
 
         #Receiving from secondary
         try:
-            data = conn.recv(1024) # 1024 stands for bytes of data to be received
+            data = conn.recv(2048) # 2048 stands for bytes of data to be received
             if data:
                 s2m.put("recv:" + str(conn.fileno()) + ":" + "{" + data + "}")
             else:
@@ -212,7 +212,7 @@ def primarythread(sock, main2primary, primary2main):
 
             #Receiving from primary
             try:
-                data = conn.recv(1024) # 1024 stands for bytes of data to be received
+                data = conn.recv(2048) # 2048 stands for bytes of data to be received
                 if data:
                     primary2main.put("recv:" + str(addr) + ":" + "{" + data + "}")
                 else:
@@ -227,8 +227,6 @@ def primarythread(sock, main2primary, primary2main):
 
 def close_all_secondary():
     """Exit all secondary processes"""
-
-    return;
 
     global SECONDARY_COUNT
 

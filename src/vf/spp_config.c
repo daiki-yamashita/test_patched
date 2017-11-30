@@ -136,11 +136,11 @@ config_get_str_value(const json_t *obj, const char *path, char *value)
 static void
 config_init_data(struct spp_config_area *config)
 {
-  /* Clear config area with zero */
+	/* Clear config area with zero */
 	memset(config, 0x00, sizeof(struct spp_config_area));
 	int core_cnt, port_cnt, table_cnt;
 
-  /* Set all of interface type of ports and mac tables to UNDEF */
+	/* Set all of interface type of ports and mac tables to UNDEF */
 	for (core_cnt = 0; core_cnt < SPP_CONFIG_CORE_MAX; core_cnt++) {
 		for (port_cnt = 0; port_cnt < RTE_MAX_ETHPORTS; port_cnt++) {
 			config->proc.functions[core_cnt].rx_ports[port_cnt].if_type = UNDEF;
@@ -188,7 +188,7 @@ spp_config_get_if_info(const char *port, enum port_type *if_type, int *if_no)
 		return -1;
 	}
 
-  /* Change type of number of interface */
+	/* Change type of number of interface */
 	int ret_no = strtol(no_str, &endptr, 0);
 	if (unlikely(no_str == endptr) || unlikely(*endptr != '\0')) { 
 		/* No IF number */
@@ -321,7 +321,7 @@ config_load_classifier_table(const json_t *obj,
 	}
 	classifier_table->num_table = array_num;
 
-  /* Setup for each of mac tables */
+	/* Setup for each of mac tables */
 	struct spp_config_mac_table_element *tmp_table = NULL;
 	char if_str[SPP_CONFIG_STR_LEN];
 	int table_cnt = 0;
@@ -346,10 +346,10 @@ config_load_classifier_table(const json_t *obj,
 			return -1;
 		}
 
-    /**
-     * If mac address is set to 'default', replace it to reserved
-     * dummy address for validation.
-     */
+		/**
+		  * If mac address is set to 'default', replace it to reserved
+		  * dummy address for validation.
+		  */
 		if (unlikely(strcmp(tmp_table->mac_addr_str,
 				SPP_CONFIG_DEFAULT_CLASSIFIED_SPEC_STR) == 0))
 			strcpy(tmp_table->mac_addr_str,
@@ -375,7 +375,7 @@ config_load_classifier_table(const json_t *obj,
 				table_cnt, JSONPATH_PORT);
 			return -1;
 		}
-    /* And separate it to type and number */
+		/* And separate it to type and number */
 		int ret_if = spp_config_get_if_info(if_str, &tmp_table->port.if_type,
 				&tmp_table->port.if_no);
 		if (unlikely(ret_if != 0)) {
@@ -433,7 +433,7 @@ config_set_rx_port(enum spp_core_type type, json_t *obj,
 			return -1;
 		}
 
-	  /* Check if the size of array is not over RTE_MAX_ETHPORTS */
+		/* Check if the size of array is not over RTE_MAX_ETHPORTS */
 		int port_num = json_array_size(array_obj);
 		if (unlikely(port_num <= 0) ||
 				unlikely(port_num > RTE_MAX_ETHPORTS)) {
@@ -557,7 +557,7 @@ config_set_tx_port(enum spp_core_type type, json_t *obj,
 				return -1;
 			}
 
-	    /* Check if the size of array is not over RTE_MAX_ETHPORTS */
+			/* Check if the size of array is not over RTE_MAX_ETHPORTS */
 			int port_num = json_array_size(array_obj);
 			if (unlikely(port_num <= 0) ||
 					unlikely(port_num > RTE_MAX_ETHPORTS)) {
@@ -579,7 +579,7 @@ config_set_tx_port(enum spp_core_type type, json_t *obj,
 					return -1;
 				}
 
-        /* Get sending port */
+				/* Get sending port */
 				if (unlikely(!json_is_string(elements_obj))) {
 					RTE_LOG(ERR, APP, "Not a string. (path = %s, No = %d, route = classifier)\n",
 							JSONPATH_TX_PORT, array_cnt);
@@ -587,7 +587,7 @@ config_set_tx_port(enum spp_core_type type, json_t *obj,
 				}
 				strcpy(if_str, json_string_value(elements_obj));
 
-		    /* Separate it to interface type and number */
+				/* Separate it to interface type and number */
 				int ret_if = spp_config_get_if_info(if_str, &tmp_tx_port->if_type,
 						&tmp_tx_port->if_no);
 				if (unlikely(ret_if != 0)) {

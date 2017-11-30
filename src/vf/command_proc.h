@@ -20,7 +20,8 @@ spp_command_proc_init(const char *controller_ip, int controller_port);
  * process command from controller.
  *
  * @retval 0  succeeded.
- * @retval -1 failed.
+ * @retval -1 process termination is required.
+ *            (occurred connection failure, or received exit command)
  */
 int
 spp_command_proc_do(void);
