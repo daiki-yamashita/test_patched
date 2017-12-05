@@ -488,6 +488,7 @@ set_nic_interface(void)
 	}
 
 	for (nic_cnt = 0; nic_cnt < g_if_info.num_nic; nic_cnt++) {
+		g_if_info.nic[nic_cnt].if_type   = PHY;
 		g_if_info.nic[nic_cnt].dpdk_port = nic_cnt;
 	}
 
@@ -842,6 +843,16 @@ spp_check_added_port(enum port_type if_type, int if_no)
 }
 
 /*
+ * Check if port has been flushed.
+ */
+int
+spp_check_flush_port(enum port_type if_type, int if_no)
+{
+	struct spp_port_info *port = get_if_area(if_type, if_no);
+	return port->dpdk_port >= 0;
+}
+
+/*
  * Check if component is using port.
  */
 int
@@ -1068,6 +1079,7 @@ spp_update_component(
 		core->num++;
 		ret = SPP_RET_OK;
 		tmp_lcore_id = lcore_id;
+		g_change_component[component_id] = 1;
 		break;
 
 	case SPP_CMD_ACTION_STOP:
@@ -1091,6 +1103,7 @@ spp_update_component(
 			core->type = SPP_COMPONENT_UNUSE;
 
 		ret = SPP_RET_OK;
+		g_change_component[component_id] = 0;
 		break;
 
 	default:
@@ -1320,6 +1333,44 @@ spp_flush(void)
 	return SPP_RET_OK;
 }
 
+/* Iterate core infomartion */
+int
+spp_iterate_core_info(struct spp_iterate_core_params *params)
+{
+	int ret;
+	int core_cnt, cnt;
+	struct core_info *core = NULL;
+
+	for (core_cnt = 0; core_cnt < RTE_MAX_LCORE; core_cnt++) {
+		if (spp_get_core_status(core_cnt) == SPP_CORE_UNUSE)
+			continue;
+
+		core = get_core_info(core_cnt);
+		for (cnt = 0; cnt < core->num; cnt++) {
+			if (core->type == SPP_COMPONENT_CLASSIFIER_MAC) {
+				ret = spp_classifier_component_info_iterate(
+						core_cnt,
+						core->id[cnt],
+						params);
+			} else {
+				ret = spp_forward_core_info_iterate(
+						core_cnt,
+						core->id[cnt],
+						params);
+			}
+			if (unlikely(ret != 0)) {
+				RTE_LOG(ERR, APP, "Cannot iterate core information. "
+						"(core = %d, type = %d)\n",
+						core_cnt, core->type);
+				return SPP_RET_NG;
+			}
+		}
+	}
+
+	return SPP_RET_OK;
+}
+
+/* Iterate Classifier_table */
 int
 spp_iterate_classifier_table(
 		struct spp_iterate_classifier_table_params *params)

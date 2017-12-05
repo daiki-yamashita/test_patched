@@ -566,7 +566,7 @@ static struct decode_command_list command_list[] = {
 	{ "_get_client_id",   1, 1, NULL                            }, /* _get_client_id   */
 	{ "status",           1, 1, NULL                            }, /* status           */
 	{ "exit",             1, 1, NULL                            }, /* exit             */
-	{ "component",        3, 5, decode_comand_parameter_in_list }, /* port             */
+	{ "component",        3, 5, decode_comand_parameter_in_list }, /* component        */
 	{ "port",             5, 5, decode_comand_parameter_in_list }, /* port             */
 	{ "",                 0, 0, NULL                            }  /* termination      */
 };

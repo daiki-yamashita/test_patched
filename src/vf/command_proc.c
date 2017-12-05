@@ -243,9 +243,191 @@ append_response_client_id_value(json_t *parent_obj)
 	return 0;
 }
 
+/* append client-id value */
+static int
+append_client_id_value(json_t *parent_obj)
+{
+	int ret = -1;
+	ret = json_object_set_new(parent_obj, "client-id",
+			json_integer(spp_get_client_id()));
+	if (unlikely(ret != 0))
+		return -1;
+
+	return 0;
+}
+
+/* append interface array */
+static int
+append_interface_array(json_t *parent_obj, const char *name,
+		const enum port_type type)
+{
+	int ret = -1;
+	int i = 0;
+	json_t *array_obj;
+	array_obj = json_array();
+	if (unlikely(array_obj == NULL))
+		return -1;
+
+	for (i = 0; i < RTE_MAX_ETHPORTS; i++) {
+		if (!spp_check_flush_port(type, i))
+			continue;
+
+		ret = json_array_append_new(array_obj, json_integer(i));
+		if (unlikely(ret != 0)) {
+			json_decref(array_obj);
+			return -1;
+		}
+	}
+
+	ret = json_object_set_new(parent_obj, name, array_obj);
+	if (unlikely(ret != 0)) {
+		json_decref(array_obj);
+		return -1;
+	}
+
+	return 0;
+}
+
+/* append interface value */
+static int
+append_interface_value(json_t *parent_obj)
+{
+	int ret = -1;
+	ret = append_interface_array(parent_obj, "phy", PHY);
+	if (unlikely(ret != 0))
+		return -1;
+
+	ret = append_interface_array(parent_obj, "vhost", VHOST);
+	if (unlikely(ret != 0))
+		return -1;
+
+	ret = append_interface_array(parent_obj, "ring", RING);
+	if (unlikely(ret != 0))
+		return -1;
+
+	return 0;
+}
+
+/* append port array */
+static int
+apeend_port_array(json_t *parent_obj, const char *name,
+		const int num, const struct spp_port_index *ports)
+{
+	int ret = -1;
+	int i = 0;
+	char port_str[64];
+	json_t *array_obj;
+	array_obj = json_array();
+	if (unlikely(array_obj == NULL))
+		return -1;
+
+	for (i = 0; i < num; i++) {
+		spp_format_port_string(port_str, ports[i].if_type,
+				ports[i].if_no);
+		ret = json_array_append_new(array_obj, json_string(port_str));
+		if (unlikely(ret != 0)) {
+			json_decref(array_obj);
+			return -1;
+		}
+	}
+
+	ret = json_object_set_new(parent_obj, name, array_obj);
+	if (unlikely(ret != 0)) {
+		json_decref(array_obj);
+		return -1;
+	}
+
+	return 0;
+}
+
+/* append core element value */
+static int
+append_core_element_value(
+		void *opaque, const unsigned int lcore_id,
+		const char *name, const char *type,
+		const int num_rx, const struct spp_port_index *rx_ports,
+		const int num_tx, const struct spp_port_index *tx_ports)
+{
+	int ret = -1;
+	json_t *parent_obj = (json_t *)opaque;
+	json_t *tab_obj;
+
+	tab_obj = json_object();
+	if (unlikely(tab_obj == NULL))
+		return -1;
+
+	ret = json_object_set_new(tab_obj, "core", json_integer(lcore_id));
+	if (unlikely(ret != 0)) {
+		json_decref(tab_obj);
+		return -1;
+	}
+
+	ret = json_object_set_new(tab_obj, "name", json_string(name));
+	if (unlikely(ret != 0)) {
+		json_decref(tab_obj);
+		return -1;
+	}
+
+	ret = json_object_set_new(tab_obj, "type", json_string(type));
+	if (unlikely(ret != 0)) {
+		json_decref(tab_obj);
+		return -1;
+	}
+
+	ret = apeend_port_array(tab_obj, "rx_port", num_rx, rx_ports);
+	if (unlikely(ret != 0)) {
+		json_decref(tab_obj);
+		return -1;
+	}
+
+	ret = apeend_port_array(tab_obj, "tx_port", num_tx, tx_ports);
+	if (unlikely(ret != 0)) {
+		json_decref(tab_obj);
+		return -1;
+	}
+
+	ret = json_array_append_new(parent_obj, tab_obj);
+	if (unlikely(ret != 0)) {
+		json_decref(tab_obj);
+		return -1;
+	}
+
+	return 0;
+}
+
+/* append core value */
+static int
+append_response_core_value(json_t *parent_obj)
+{
+	int ret = -1;
+	json_t *tab_obj;
+	struct spp_iterate_core_params itr_params;
+
+	tab_obj = json_array();
+	if (unlikely(tab_obj == NULL))
+		return -1;
+
+	itr_params.opaque = tab_obj;
+	itr_params.element_proc = append_core_element_value;
+
+	ret = spp_iterate_core_info(&itr_params);
+	if (unlikely(ret != 0)) {
+		json_decref(tab_obj);
+		return -1;
+	}
+
+	ret = json_object_set_new(parent_obj, "core", tab_obj);
+	if (unlikely(ret != 0)) {
+		json_decref(tab_obj);
+		return -1;
+	}
+
+	return 0;
+}
+
 /* append classifier element value */
-static
-int append_classifier_element_value(
+static int
+append_classifier_element_value(
 		void *opaque,
 		__rte_unused enum spp_classifier_type type,
 		const char *data,
@@ -265,12 +447,12 @@ int append_classifier_element_value(
 	return 0;
 }
 
-/* append info value(status response) to specified json object */
+/* append classifier_table value */
 static int 
-append_response_info_value(json_t *parent_obj)
+append_response_classifier_value(json_t *parent_obj)
 {
 	int ret = -1;
-	json_t *info_obj, *tab_obj;
+	json_t *tab_obj;
 	struct spp_iterate_classifier_table_params itr_params;
 
 	/* create classifier_table array */
@@ -287,16 +469,48 @@ append_response_info_value(json_t *parent_obj)
 		return -1;
 	}
 
-	/* set classifier_table object in info object */
-	info_obj = json_object();
-	if (unlikely(info_obj == NULL)) {
+	ret = json_object_set_new(parent_obj, "classifier_table", tab_obj);
+	if (unlikely(ret != 0)) {
 		json_decref(tab_obj);
 		return -1;
 	}
 
-	ret = json_object_set_new(info_obj, "classifier_table", tab_obj);
+	return 0;
+}
+
+/* append info value(status response) to specified json object */
+static int 
+append_response_info_value(json_t *parent_obj)
+{
+	int ret = -1;
+	json_t *info_obj;
+
+	/* set classifier_table object in info object */
+	info_obj = json_object();
+	if (unlikely(info_obj == NULL))
+		return -1;
+
+	ret = append_client_id_value(info_obj);
 	if (unlikely(ret != 0)) {
-		json_decref(tab_obj);
+		json_decref(info_obj);
+		return -1;
+	}
+
+	ret = append_interface_value(info_obj);
+	if (unlikely(ret != 0)) {
+		json_decref(info_obj);
+		return -1;
+	}
+
+	ret = append_response_core_value(info_obj);
+	if (unlikely(ret != 0)) {
+		json_decref(info_obj);
+		return -1;
+	}
+
+	ret = append_response_classifier_value(info_obj);
+	if (unlikely(ret != 0)) {
+		json_decref(info_obj);
 		return -1;
 	}
 

@@ -40,6 +40,7 @@ def connectionthread(name, client_id, conn, m2s, s2m):
     """Manage secondary process connections"""
 
     cmd_str = 'hello'
+    recv_str = 'recv'
 
     #infinite loop so that function do not terminate and thread do not end.
     while True:
@@ -60,12 +61,24 @@ def connectionthread(name, client_id, conn, m2s, s2m):
 
         #Receiving from secondary
         try:
-            data = conn.recv(2048) # 2048 stands for bytes of data to be received
-            if data:
-                s2m.put("recv:" + str(conn.fileno()) + ":" + "{" + data + "}")
-            else:
-                s2m.put("closing:" + str(conn))
+            recv_str = ""
+            while True:
+                data = conn.recv(1024) # 1024 stands for bytes of data to be received
+                if data:
+                    recv_str = recv_str + data
+                    if len(data) < 1024:
+                        break
+                else:
+                    break
+            if len(recv_str) > 0:
+                recv_str = "recv:" + str(conn.fileno()) + ":len:" + str(len(recv_str)) + ":\n{" + recv_str + "}\n"
+
+            if not data:
+                s2m.put(recv_str + "closing:" + str(conn))
                 break
+
+            #s2m.put("recv:" + str(conn.fileno()) + ":{" + recv_str + "}")
+            s2m.put(recv_str)
         except Exception, excep:
             print (str(excep))
             break
@@ -212,7 +225,7 @@ def primarythread(sock, main2primary, primary2main):
 
             #Receiving from primary
             try:
-                data = conn.recv(2048) # 2048 stands for bytes of data to be received
+                data = conn.recv(1024) # 1024 stands for bytes of data to be received
                 if data:
                     primary2main.put("recv:" + str(addr) + ":" + "{" + data + "}")
                 else:

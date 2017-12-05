@@ -3,6 +3,10 @@
 
 #include "common.h"
 
+#define SPP_TYPE_CLASSIFIER_MAC_STR "classifier_mac"
+#define SPP_TYPE_MERGE_STR          "merge"
+#define SPP_TYPE_FORWARD_STR        "forward"
+
 #define SPP_IFTYPE_NIC_STR   "phy"
 #define SPP_IFTYPE_VHOST_STR "vhost"
 #define SPP_IFTYPE_RING_STR  "ring"
@@ -162,6 +166,26 @@ int spp_update_port(
  */
 int spp_flush(void);
 
+/* definition of iterated core element procedure function */
+typedef int (*spp_iterate_core_element_proc)(
+		void *opaque,
+		const unsigned int lcore_id,
+		const char *name,
+		const char *type,
+		const int num_rx,
+		const struct spp_port_index *rx_ports,
+		const int num_tx,
+		const struct spp_port_index *tx_ports);
+
+/* iterate core information  parameters */
+struct spp_iterate_core_params {
+	void *opaque;
+	spp_iterate_core_element_proc element_proc;
+};
+
+/* Iterate core infomartion */
+int spp_iterate_core_info(struct spp_iterate_core_params *params);
+
 /* definition of iterated classifier element procedure function */
 typedef int (*spp_iterate_classifier_element_proc)(
 		void *opaque,
@@ -219,6 +243,12 @@ int spp_check_mac_used_port(uint64_t mac_addr, enum port_type if_type, int if_no
  * RETURN : True if port has been added.
  */
 int spp_check_added_port(enum port_type if_type, int if_no);
+
+/*
+ * Check if port has been flushed.
+ * RETURN : True if port has been flushed.
+ */
+int spp_check_flush_port(enum port_type if_type, int if_no);
 
 /*
  * Check if component is using port.

@@ -12,15 +12,19 @@ struct forward_rxtx {
 	struct spp_port_info tx;
 };
 
+/* Information on the path used for forward. */
 struct forward_path {
-	int num;
+	char name[SPP_NAME_STR_LEN];	/* component name          */
+	volatile enum spp_component_type type;	/* component type          */
+	int num;			/* number of receive ports */
 	struct forward_rxtx ports[RTE_MAX_ETHPORTS];
+					/* port used for transfer  */
 };
 
+/* Information for forward. */
 struct forward_info {
-	enum spp_component_type type;
-	volatile int ref_index;
-	volatile int upd_index;
+	volatile int ref_index;		/* index to reference area */
+	volatile int upd_index;		/* index to update area    */
 	struct forward_path path[SPP_INFO_AREA_MAX];
 };
 
@@ -42,8 +46,6 @@ spp_forward_init(void)
 static void
 clear_forward_info(int id)
 {
-	struct forward_info *info = &g_forward_info[id];
-	info->type = SPP_COMPONENT_UNUSE;
 	memset(&g_forward_info[id].path, 0x00, sizeof(struct forward_path));
 }
 
@@ -75,10 +77,11 @@ spp_forward_update(struct spp_component_info *component)
 	clear_forward_info(component->component_id);
 
 	RTE_LOG(INFO, FORWARD,
-			"Component[%d] Start update component. (type = %d)\n",
-			component->component_id, component->type);
+			"Component[%d] Start update component. (name = %s, type = %d)\n",
+			component->component_id, component->name, component->type);
 
-	info->type = component->type;
+	memcpy(&path->name, component->name, SPP_NAME_STR_LEN);
+	path->type = component->type;
 	path->num = component->num_rx_port;
 	for (cnt = 0; cnt < num_rx; cnt++)
 		memcpy(&path->ports[cnt].rx, component->rx_ports[cnt],
@@ -93,8 +96,9 @@ spp_forward_update(struct spp_component_info *component)
 	while(likely(info->ref_index == info->upd_index))
 		rte_delay_us_block(SPP_CHANGE_UPDATE_INTERVAL);
 
-	RTE_LOG(INFO, FORWARD, "Component[%d] Complete update component. (type = %d)\n",
-			component->component_id, component->type);
+	RTE_LOG(INFO, FORWARD,
+			"Component[%d] Complete update component. (name = %s, type = %d)\n",
+			component->component_id, component->name, component->type);
 
 	return 0;
 }
@@ -158,5 +162,52 @@ spp_forward(int id)
 				rte_pktmbuf_free(bufs[buf]);
 		}
 	}
+	return 0;
+}
+
+/* Merge/Forward iterate component information */
+int
+spp_forward_core_info_iterate(unsigned int lcore_id, int id,
+		struct spp_iterate_core_params *params)
+{
+	int ret = -1;
+	int cnt, num_tx;
+	const char *component_type = NULL;
+	struct forward_info *info = &g_forward_info[id];
+	struct forward_path *path = &info->path[info->ref_index];
+	struct spp_port_index rx_ports[RTE_MAX_ETHPORTS];
+	struct spp_port_index tx_ports[RTE_MAX_ETHPORTS];
+
+	if (unlikely(path->type == SPP_COMPONENT_UNUSE)) {
+		RTE_LOG(ERR, FORWARD,
+				"Component[%d] Not used. (status)(core = %d, type = %d)\n",
+				id, lcore_id, path->type);
+		return -1;
+	}
+
+	if (path->type == SPP_COMPONENT_MERGE)
+		component_type = SPP_TYPE_MERGE_STR;
+	else
+		component_type = SPP_TYPE_FORWARD_STR;
+
+	memset(rx_ports, 0x00, sizeof(rx_ports));
+	for (cnt = 0; cnt < path->num; cnt++) {
+		rx_ports[cnt].if_type = path->ports[cnt].rx.if_type;
+		rx_ports[cnt].if_no   = path->ports[cnt].rx.if_no;
+	}
+
+	memset(tx_ports, 0x00, sizeof(tx_ports));
+	num_tx = (path->num > 0)?1:0;
+	tx_ports[0].if_type = path->ports[0].tx.if_type;
+	tx_ports[0].if_no   = path->ports[0].tx.if_no;
+
+	/* Set the information with the function specified by the command. */
+	ret = (*params->element_proc)(
+		params->opaque, lcore_id,
+		path->name, component_type,
+		path->num, rx_ports, num_tx, tx_ports);
+	if (unlikely(ret != 0))
+		return -1;
+
 	return 0;
 }
