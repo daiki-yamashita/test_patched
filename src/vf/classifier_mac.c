@@ -372,7 +372,7 @@ handle_l2multicast_packet(struct rte_mbuf *pkt,
 		return;
 	}
 
-	rte_mbuf_refcnt_update(pkt, classifier_info->num_active_classified);
+	rte_mbuf_refcnt_update(pkt, (classifier_info->num_active_classified - 1));
 
 	for (i= 0; i < classifier_info->num_active_classified; i++) {
 		push_packet(pkt, classified_data + 
