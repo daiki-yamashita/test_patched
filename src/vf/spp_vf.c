@@ -1338,30 +1338,44 @@ int
 spp_iterate_core_info(struct spp_iterate_core_params *params)
 {
 	int ret;
-	int core_cnt, cnt;
+	int lcore_id, cnt;
 	struct core_info *core = NULL;
 
-	for (core_cnt = 0; core_cnt < RTE_MAX_LCORE; core_cnt++) {
-		if (spp_get_core_status(core_cnt) == SPP_CORE_UNUSE)
+	RTE_LCORE_FOREACH_SLAVE(lcore_id) {
+		if (spp_get_core_status(lcore_id) == SPP_CORE_UNUSE)
 			continue;
 
-		core = get_core_info(core_cnt);
+		core = get_core_info(lcore_id);
+		if (core->num == 0) {
+			ret = (*params->element_proc)(
+				params->opaque, lcore_id,
+				"", SPP_TYPE_UNUSE_STR,
+				0, NULL, 0, NULL);
+			if (unlikely(ret != 0)) {
+				RTE_LOG(ERR, APP, "Cannot iterate core information. "
+						"(core = %d, type = %d)\n",
+						lcore_id, SPP_COMPONENT_UNUSE);
+				return SPP_RET_NG;
+			}
+			continue;
+		}
+
 		for (cnt = 0; cnt < core->num; cnt++) {
 			if (core->type == SPP_COMPONENT_CLASSIFIER_MAC) {
 				ret = spp_classifier_component_info_iterate(
-						core_cnt,
+						lcore_id,
 						core->id[cnt],
 						params);
 			} else {
 				ret = spp_forward_core_info_iterate(
-						core_cnt,
+						lcore_id,
 						core->id[cnt],
 						params);
 			}
 			if (unlikely(ret != 0)) {
 				RTE_LOG(ERR, APP, "Cannot iterate core information. "
 						"(core = %d, type = %d)\n",
-						core_cnt, core->type);
+						lcore_id, core->type);
 				return SPP_RET_NG;
 			}
 		}

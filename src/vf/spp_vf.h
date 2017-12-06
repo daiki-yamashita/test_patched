@@ -6,6 +6,7 @@
 #define SPP_TYPE_CLASSIFIER_MAC_STR "classifier_mac"
 #define SPP_TYPE_MERGE_STR          "merge"
 #define SPP_TYPE_FORWARD_STR        "forward"
+#define SPP_TYPE_UNUSE_STR          "unuse"
 
 #define SPP_IFTYPE_NIC_STR   "phy"
 #define SPP_IFTYPE_VHOST_STR "vhost"

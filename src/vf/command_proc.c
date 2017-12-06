@@ -349,6 +349,7 @@ append_core_element_value(
 		const int num_tx, const struct spp_port_index *tx_ports)
 {
 	int ret = -1;
+	int unuse_flg = 0;
 	json_t *parent_obj = (json_t *)opaque;
 	json_t *tab_obj;
 
@@ -356,16 +357,20 @@ append_core_element_value(
 	if (unlikely(tab_obj == NULL))
 		return -1;
 
+	unuse_flg = strcmp(type, SPP_TYPE_UNUSE_STR);
+
 	ret = json_object_set_new(tab_obj, "core", json_integer(lcore_id));
 	if (unlikely(ret != 0)) {
 		json_decref(tab_obj);
 		return -1;
 	}
 
-	ret = json_object_set_new(tab_obj, "name", json_string(name));
-	if (unlikely(ret != 0)) {
-		json_decref(tab_obj);
-		return -1;
+	if (unuse_flg) {
+		ret = json_object_set_new(tab_obj, "name", json_string(name));
+		if (unlikely(ret != 0)) {
+			json_decref(tab_obj);
+			return -1;
+		}
 	}
 
 	ret = json_object_set_new(tab_obj, "type", json_string(type));
@@ -374,16 +379,18 @@ append_core_element_value(
 		return -1;
 	}
 
-	ret = apeend_port_array(tab_obj, "rx_port", num_rx, rx_ports);
-	if (unlikely(ret != 0)) {
-		json_decref(tab_obj);
-		return -1;
-	}
+	if (unuse_flg) {
+		ret = apeend_port_array(tab_obj, "rx_port", num_rx, rx_ports);
+		if (unlikely(ret != 0)) {
+			json_decref(tab_obj);
+			return -1;
+		}
 
-	ret = apeend_port_array(tab_obj, "tx_port", num_tx, tx_ports);
-	if (unlikely(ret != 0)) {
-		json_decref(tab_obj);
-		return -1;
+		ret = apeend_port_array(tab_obj, "tx_port", num_tx, tx_ports);
+		if (unlikely(ret != 0)) {
+			json_decref(tab_obj);
+			return -1;
+		}
 	}
 
 	ret = json_array_append_new(parent_obj, tab_obj);
